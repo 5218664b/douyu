@@ -1,0 +1,4 @@
+#!/bin/bash
+node /root/openwrt_douyu/douyu/app_forever/init_rtmp.js $1 $2 $3
+node /root/openwrt_douyu/douyu/app_forever/update_movie_list.js $4
+forever start /root/openwrt_douyu/douyu/app_forever/development.json

@@ -1,0 +1,7 @@
+{
+    "uid": "app",
+    "append": true,
+    "watch": true,
+    "script": "live.js",
+    "sourceDir": "/root/openwrt_douyu/douyu/live"
+}

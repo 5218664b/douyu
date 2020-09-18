@@ -1,0 +1,17 @@
+{
+	"cur": "0",
+	"video": [
+		{
+			"name": "test1",
+			"value": "/mnt/sda5/movie/1.mp4"
+		},
+		{
+			"name": "test2",
+			"value": "/mnt/sda5/movie/恐怖游轮BD中英双字[电影天堂www.dy2018.com].mp4"
+		},
+		{
+			"name": "test3",
+			"value": "/mnt/sda5/movie/[电影天堂www.dytt89.com]千与千寻BD日语中字.mp4"
+		}
+	]
+}
