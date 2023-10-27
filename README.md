@@ -1,2 +1,5 @@
-# openwrt_douyu
-在树莓派刷openwrt折腾
+# openwrt
+在树莓派4b刷openwrt折腾
+
+# Raspbian
+Raspbian Os推流
