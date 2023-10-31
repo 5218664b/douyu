@@ -1,4 +1,4 @@
-#!/bin/bash
+ #!/bin/bash
 
 # 设置工作根目录
 work_dir="/home/pi/samba/douyu"
@@ -38,6 +38,7 @@ mapfile -t video_files < <(find "$tv_series_dir" -type f -name "*.ts" | sort)
 
 # nohup ffmpeg -re -stream_loop -1 -f concat -safe 0 -i "$concat_file" -c copy -f flv "$rtmp_url" &
 # ffmpeg -loglevel quiet -re -stream_loop -1 -f concat -safe 0 -i "$concat_file" -c copy -f flv "$rtmp_url" &
+# ffmpeg -re -stream_loop -1 -f concat -safe 0 -i ./videos.txt -i logo.png -filter_complex "[0:v][1:v]overlay=10:10" -c:a copy -bsf:a aac_adtstoasc -f flv rtmp://192.168.1.80:1935/live/
 # ffmpeg -re -stream_loop -1 -f concat -safe 0 -i ./videos.txt -c copy -bsf:a aac_adtstoasc -f flv rtmp://192.168.1.80:1935/live/
 nohup ffmpeg -re -stream_loop -1 -f concat -safe 0 -i "$concat_file" -c copy -bsf:a aac_adtstoasc -f flv "$rtmp_url" &
 
@@ -50,7 +51,7 @@ while true; do
     echo "$current_video" > "$current_videos_file"
     ln -sf "$current_video" "$video_dir/current_videos.ts"
     duration=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$current_video")
-    sleep_duration=$(echo "$duration + $cache_duration - $wait_duration" | bc)
+    sleep_duration=$(echo "$duration + $cache_duration + $wait_duration" | bc)
     sleep $sleep_duration
   done
 done
