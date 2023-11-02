@@ -25,6 +25,7 @@ from Danmaku.douyu import Douyu
 #from biliup.plugins.Danmaku.douyin import Douyin
 
 from Utils import process_string
+from Videos import Util
 
 logger = logging.getLogger('biliup')
 
@@ -33,7 +34,7 @@ class DanmakuClient:
     class WebsocketErrorException(Exception):
         pass
 
-    def __init__(self, url, filename):
+    def __init__(self, url, filename, Util):
         self.__starttime = time.time()
         self.__filename = os.path.splitext(filename)[0] + '.xml'
         self.__filename_video_suffix = filename
@@ -43,6 +44,7 @@ class DanmakuClient:
         self.__ws = None
         self.__dm_queue = None
         self.__record_task: Optional[asyncio.Task] = None
+        self.Util = Util
 
         if 'http://' == url[:7] or 'https://' == url[:8]:
             self.__url = url
@@ -169,7 +171,8 @@ class DanmakuClient:
                         msg_i = msg_i + 1
                         logger.warning(d.text)
                         if d.text.startswith('#'):
-                            process_string(d.text)
+                            #self.Util.insert_videos_list(int(process_string(d.text)))
+                            self.Util.loop_move_videos_list(int(process_string(d.text)))
         except asyncio.CancelledError:
             # 在这段代码中只有执行m = await self.__dm_queue.get()的时候可能会被取消 所以无需担心其他问题
             # 任务被取消之前需要写入一下 不然会丢失没写入的
