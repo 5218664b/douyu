@@ -5,6 +5,7 @@ import time
 from Danmaku import DanmakuClient
 import Utils
 from Videos import Util
+from datetime import datetime
 
 #url = 'https://www.douyu.com/1126960'
 url = 'https://www.douyu.com/9163452'
@@ -29,6 +30,7 @@ def main():
     concat_file = os.path.join(work_dir, "videos.txt")
     video_list_file = os.path.join(work_dir, "videos_list.txt")
     current_videos_file = os.path.join(video_dir, "current_videos.txt")
+    play_videos_log = os.path.join(video_dir, "play_videos_log.txt")
     current_videos_ts = os.path.join(video_dir, "current_videos.ts")
 
     # 设置RTMP URL
@@ -82,11 +84,19 @@ def main():
             if int(current_duration)/1000 > total_duration - 10:
                 current_video = videos_util.get_videos_ts_one()
                 videos_util.videos_index_plus()
+
+                # 打开文件以追加写入（如果文件不存在则创建）
+                with open(play_videos_log, 'a') as file:
+                    # 写入内容到文件
+                    file.write(f"current_duration: {(int(current_duration)/1000):.2f}" + '\n')
+                    file.write(f"total_duration: {total_duration:.2f}" + '\n')
+                    file.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ": " + current_video + '\n')
                 break
 
         with open(current_videos_file, "w") as f:
             f.write(current_video)
         print("current_video: " + current_video)
+
         # 如果目标文件已存在，先删除它
         if os.path.exists(current_videos_ts):
             os.remove(current_videos_ts)
