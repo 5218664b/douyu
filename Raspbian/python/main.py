@@ -6,6 +6,7 @@ from Danmaku import DanmakuClient
 import Utils
 from Videos import Util
 from datetime import datetime
+import sys
 
 #url = 'https://www.douyu.com/1126960'
 url = 'https://www.douyu.com/9163452'
@@ -16,6 +17,9 @@ suffix = 'txt'
 
 #tv_series_dir = "/home/pi/samba/douyu/tmp1"
 tv_series_dir = "/home/pi/samba/电视剧/士兵突击(Soldiers Sortie)624x336.X264.AAC.350M.30集全[DVDRip]/output"
+
+# 设置RTMP URL
+rtmp_url = "rtmp://192.168.1.80:1935/live/"
 
 # nohup python3 main.py &
 def main():
@@ -33,9 +37,6 @@ def main():
     current_videos_file = os.path.join(video_dir, "current_videos.txt")
     play_videos_log = os.path.join(video_dir, "play_videos_log.txt")
     current_videos_ts = os.path.join(video_dir, "current_videos.ts")
-
-    # 设置RTMP URL
-    rtmp_url = "rtmp://192.168.1.80:1935/live/"
 
     # 设置cache文件
     cache_file = os.path.join(video_dir, "cache.ts")
@@ -110,4 +111,23 @@ def main():
 
 
 if __name__ == '__main__':
+    if len(sys.argv) != 3:
+        print("Usage: python update_config.py <rtmp_url> <stream_key>")
+        sys.exit(1)
+
+    rtmp_push_url = sys.argv[1]
+    stream_push_key = sys.argv[2]
+
+    with open('/home/pi/samba/douyu/conf/nginx.conf', 'r') as file:
+        lines = file.readlines()
+
+    push_line = f'      push {rtmp_push_url}/{stream_push_key};\n'
+    lines.pop(28)
+    lines.insert(28, push_line)
+
+    with open('/home/pi/samba/douyu/conf/nginx.conf', 'w') as file:
+        file.writelines(lines)
+
+    subprocess.run(["sudo", "docker", "restart", "some-nginx"])
+    
     main()
