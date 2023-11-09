@@ -162,7 +162,7 @@ class DanmakuClient:
                         # 异常后略过本次弹幕
                         continue
 
-                    if msg_i >= 5:
+                    if msg_i >= 1:
                         # 收到五条弹幕后写入 减少io
                         # 可能会写入失败 会在下次五条或者任务被取消时重新尝试写入
                         write_file(self.__filename)

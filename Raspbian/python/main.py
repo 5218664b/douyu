@@ -17,6 +17,7 @@ suffix = 'txt'
 #tv_series_dir = "/home/pi/samba/douyu/tmp1"
 tv_series_dir = "/home/pi/samba/电视剧/士兵突击(Soldiers Sortie)624x336.X264.AAC.350M.30集全[DVDRip]/output"
 
+# nohup python3 main.py &
 def main():
     videos_util = Util(tv_series_dir)
 
@@ -62,7 +63,8 @@ def main():
     os.symlink(videos_util.get_vides_ts(0), current_videos_ts)
 
     # nohup ffmpeg -re -stream_loop -1 -f concat -safe 0 -i "$concat_file" -c copy -bsf:a aac_adtstoasc -f flv "$rtmp_url" &
-    subprocess.Popen(["nohup", "ffmpeg", "-loglevel", "quiet", "-re", "-stream_loop", "-1", "-f", "concat", "-safe", "0", "-i", concat_file, "-c", "copy", "-bsf:a", "aac_adtstoasc", "-f", "flv", rtmp_url])
+    #subprocess.Popen(["nohup", "ffmpeg", "-loglevel", "quiet", "-re", "-stream_loop", "-1", "-f", "concat", "-safe", "0", "-i", concat_file, "-c", "copy", "-bsf:a", "aac_adtstoasc", "-f", "flv", rtmp_url])
+    subprocess.Popen(["nohup", "ffmpeg", "-re", "-stream_loop", "-1", "-f", "concat", "-safe", "0", "-i", concat_file, "-c", "copy", "-bsf:a", "aac_adtstoasc", "-f", "flv", rtmp_url])
 
     # 获取cache文件的持续时间
     result = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", cache_file], stdout=subprocess.PIPE)

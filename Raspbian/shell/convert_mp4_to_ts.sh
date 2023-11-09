@@ -22,7 +22,8 @@ mkdir -p "$output_dir"
 for mp4_file in *."$mp4_extension"; do
     ts_file="${mp4_file%.$mp4_extension}.ts"
     echo "当前转换：$ts_file"
-    ffmpeg -i "$mp4_file" -c copy -bsf:v h264_mp4toannexb "$output_dir/$ts_file"
+    # ffmpeg -i "$mp4_file" -c copy -bsf:v h264_mp4toannexb "$output_dir/$ts_file"
+    ffmpeg -i "$mp4_file" -c copy -bsf:v hevc_mp4toannexb -ss 00:02:56.000 "$output_dir/$ts_file"
 done
 
 echo "转换完成，文件保存在$output_dir文件夹中"
