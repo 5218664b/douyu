@@ -34,6 +34,7 @@ class Util:
 
     def loop_move_videos_list(self, target_index):
         k = self.current_videos_ts_index - target_index
+        self.current_videos_ts_index = target_index
         dq = deque(self.current_videos_ts_list)
         dq.rotate(k)
         self.current_videos_ts_list = list(dq)

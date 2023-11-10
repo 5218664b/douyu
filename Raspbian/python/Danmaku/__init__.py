@@ -169,10 +169,11 @@ class DanmakuClient:
                         msg_i = 0
                     else:
                         msg_i = msg_i + 1
-                        logger.warning(d.text)
-                        if d.text.startswith('#'):
-                            #self.Util.insert_videos_list(int(process_string(d.text)))
-                            self.Util.loop_move_videos_list(int(process_string(d.text)))
+                    
+                    logger.warning(d.text)
+                    if d.text.startswith('#'):
+                        #self.Util.insert_videos_list(int(process_string(d.text)))
+                        self.Util.loop_move_videos_list(int(process_string(d.text)))
         except asyncio.CancelledError:
             # 在这段代码中只有执行m = await self.__dm_queue.get()的时候可能会被取消 所以无需担心其他问题
             # 任务被取消之前需要写入一下 不然会丢失没写入的
