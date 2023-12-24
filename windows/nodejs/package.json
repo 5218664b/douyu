@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "open": "^10.0.1",
+    "opn": "^6.0.0",
+    "puppeteer": "^21.6.1"
+  },
+  "name": "getdouyuzhibocode",
+  "version": "1.0.0",
+  "description": "获取斗鱼直播码",
+  "main": "getdouyu.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "5218664b",
+  "license": "ISC"
+}

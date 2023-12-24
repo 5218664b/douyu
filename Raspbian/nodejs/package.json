@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "jimp": "^0.22.10",
+    "jsqr": "^1.4.0",
+    "opn": "^6.0.0",
+    "puppeteer": "^8.0.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
