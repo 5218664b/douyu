@@ -202,29 +202,41 @@ if __name__ == '__main__':
     # 你的原始配置内容
     original_nginx_config = """load_module modules/ngx_rtmp_module.so;
 
-    user nginx;
-    worker_processes 1;
+user nginx;
+worker_processes 1;
 
-    error_log /var/log/nginx/error.log warn;
-    pid /var/run/nginx.pid;
+error_log /var/log/nginx/error.log warn;
+pid /var/run/nginx.pid;
 
-    events {
-      worker_connections 1024;
+events {
+  worker_connections 1024;
+}
+
+rtmp_auto_push on;
+rtmp_auto_push_reconnect 1s;
+
+rtmp {
+  access_log /var/log/nginx/access.log;
+  server {
+    listen 1935;
+    application live {
+      live on;
+      record off;
     }
-
-    rtmp_auto_push on;
-    rtmp_auto_push_reconnect 1s;
-
-    rtmp {
-      access_log /var/log/nginx/access.log;
-      server {
-        listen 1935;
-        listen [::]:1935 ipv6only=on;
-        application live {
-          live on;
-          record off;
-        }
-      }
+  }
+}
+  
+http {
+	server {
+		listen 8088; # 监听8088端口
+		location /stat {
+			rtmp_stat all; # 提供完整的统计信息
+			rtmp_stat_stylesheet stat.xsl; # 指定样式表位置，用于美化统计信息页面
+		}
+		location /stat.xsl {
+			root /etc/nginx/conf.d/;
+		}
+    }
     }"""
     """
     在nginx rtmp配置的application live块中添加push配置项
@@ -271,7 +283,7 @@ if __name__ == '__main__':
         else:
             new_lines.append(line)
     
-    with open('/home/pi/samba/douyu/conf/nginx.conf', 'w', encoding='utf-8') as file:
+    with open('/home/pi/samba/douyu/nginx_conf/nginx.conf', 'w', encoding='utf-8') as file:
         file.write(''.join(new_lines))
 
     subprocess.run(["sudo", "docker", "restart", "nginx"])
