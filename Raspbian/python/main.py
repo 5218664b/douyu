@@ -22,7 +22,7 @@ tv_series_dir = "/home/pi/samba/hard02/magic/电视剧/士兵突击(Soldiers Sor
 #tv_series_dir = "/home/pi/samba/电视剧/shibing/output"
 
 # 设置RTMP URL
-rtmp_url = "rtmp://192.168.1.80:1935/live/"
+rtmp_url = "rtmp://127.0.0.1:1935/live/"
 
 # nohup python3 main.py &
 def main():
@@ -160,49 +160,120 @@ if __name__ == '__main__':
     #     print("Usage: python update_config.py <rtmp_url> <stream_key>")
     #     sys.exit(1)
 
-    # rtmp_push_url = sys.argv[1]
-    # stream_push_key = sys.argv[2]
-
-    # 执行 Node.js 脚本
-    node_command = 'node ../nodejs/getzhibourl.js'
-    return_code, stdout, stderr = run_command(node_command)
-
-    input_string = ''
-    # 检查返回码
-    if return_code == 0:
-        input_string = stdout
-        #print(f'Data from Node.js: {input_string}')
-    else:
-        print(f'Error running Node.js script. Stderr: {stderr}')
-
-    # 使用正则表达式提取 RTMP URL 和流推送密钥
-    rtmp_url_match = re.search(r'rtmp_url:(.*?)\n', input_string, re.DOTALL)
-    stream_push_key_match = re.search(r'stream_push_key:(.*?)\n', input_string, re.DOTALL)
-
-    # 检查匹配结果
-    if rtmp_url_match and stream_push_key_match:
-        node_rtmp_url = rtmp_url_match.group(1).strip()
-        node_stream_push_key = stream_push_key_match.group(1).strip()
-
-        #print("rtmp_url:" + node_rtmp_url)
-        #print("stream_push_key:" + node_stream_push_key)
-
-        if node_rtmp_url == '' or node_stream_push_key == '':
-            print("获取 rtmp_url 和 stream_push_key 失败")
-        else:
-            with open('/home/pi/samba/douyu/conf/nginx.conf', 'r') as file:
-                lines = file.readlines()
-
-                push_line = f'      push {node_rtmp_url}/{node_stream_push_key};\n'
-                lines.pop(28)
-                lines.insert(28, push_line)
-
-            with open('/home/pi/samba/douyu/conf/nginx.conf', 'w') as file:
-                file.writelines(lines)
-
-            subprocess.run(["sudo", "docker", "restart", "some-nginx"])
-            
-            main()
-    else:
-        print("获取rtmp_url_match和stream_push_key_match失败")
+    node_rtmp_url = ''
+    node_stream_push_key = ''
     
+    if len(sys.argv) == 3:
+        node_rtmp_url = sys.argv[1]
+        node_stream_push_key = sys.argv[2]
+    else:
+        # 执行 Node.js 脚本
+        node_command = 'node ../nodejs/getzhibourl.js'
+        return_code, stdout, stderr = run_command(node_command)
+
+        input_string = ''
+        # 检查返回码
+        if return_code == 0:
+            input_string = stdout
+            #print(f'Data from Node.js: {input_string}')
+        else:
+            print(f'Error running Node.js script. Stderr: {stderr}')
+            exit();
+
+        # 使用正则表达式提取 RTMP URL 和流推送密钥
+        rtmp_url_match = re.search(r'rtmp_url:(.*?)\n', input_string, re.DOTALL)
+        stream_push_key_match = re.search(r'stream_push_key:(.*?)\n', input_string, re.DOTALL)
+
+        # 检查匹配结果
+        if rtmp_url_match and stream_push_key_match:
+            node_rtmp_url = rtmp_url_match.group(1).strip()
+            node_stream_push_key = stream_push_key_match.group(1).strip()
+
+            #print("rtmp_url:" + node_rtmp_url)
+            #print("stream_push_key:" + node_stream_push_key)
+
+            if node_rtmp_url == '' or node_stream_push_key == '':
+                print("获取 rtmp_url 和 stream_push_key 失败")
+                exit();
+        else:
+            print("获取rtmp_url_match和stream_push_key_match失败")
+            exit();
+    
+    # 你的原始配置内容
+    original_nginx_config = """load_module modules/ngx_rtmp_module.so;
+
+    user nginx;
+    worker_processes 1;
+
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+
+    events {
+      worker_connections 1024;
+    }
+
+    rtmp_auto_push on;
+    rtmp_auto_push_reconnect 1s;
+
+    rtmp {
+      access_log /var/log/nginx/access.log;
+      server {
+        listen 1935;
+        listen [::]:1935 ipv6only=on;
+        application live {
+          live on;
+          record off;
+        }
+      }
+    }"""
+    """
+    在nginx rtmp配置的application live块中添加push配置项
+    
+    Args:
+        original_config (str): 原始的nginx配置文本
+        
+    Returns:
+        str: 添加了push配置后的新配置文本
+    """
+    # 按行分割配置内容，保留换行符以便还原格式
+    lines = original_nginx_config.splitlines(keepends=True)
+    
+    # 标记是否进入了application live块
+    in_live_block = False
+    # 记录缩进级别（用于保持格式统一）
+    indent_level = 0
+    new_lines = []
+    
+    for line in lines:
+        # 去除首尾空白字符（用于判断），保留原始行用于输出
+        stripped_line = line.strip()
+        
+        # 检测是否进入application live块
+        if stripped_line.startswith('application live {'):
+            in_live_block = True
+            # 计算缩进级别（原始行开头的空格数）
+            indent_level = len(line) - len(line.lstrip())
+            new_lines.append(line)
+            continue
+        
+        # 检测是否离开application live块
+        if in_live_block and stripped_line == '}':
+            in_live_block = False
+        
+        # 如果在live块内部，且当前行是record off;，则在其后插入push配置
+        if in_live_block and stripped_line == 'record off;':
+            new_lines.append(line)
+            # 保持和块内其他配置相同的缩进
+            indent = ' ' * (indent_level + 2)
+            # 添加push配置行
+            push_line = f'{indent}push {node_rtmp_url}/{node_stream_push_key};\n'
+            new_lines.append(push_line)
+        else:
+            new_lines.append(line)
+    
+    with open('/home/pi/samba/douyu/conf/nginx.conf', 'w', encoding='utf-8') as file:
+        file.write(''.join(new_lines))
+
+    subprocess.run(["sudo", "docker", "restart", "nginx"])
+    
+    main()

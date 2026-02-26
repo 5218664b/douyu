@@ -56,8 +56,8 @@ async function run() {
         console.log("获取到页面了");
 
         // 获取二维码
-        const waitXPathSelector = '//*[@id="loginbox"]/div[1]/div[2]/div[5]/div/div[1]/div/div[1]/div/div[1]/div/canvas';
-        const canvasXPath = '//*[@id="loginbox"]/div[1]/div[2]/div[5]/div/div[1]/div/div[1]/div/div[1]/div/canvas';
+        const waitXPathSelector = '//canvas';
+        const canvasXPath = '//canvas';
 
         await page.waitForXPath(waitXPathSelector, { timeout: 0 });
         const canvasElementHandle = await page.$x(canvasXPath);

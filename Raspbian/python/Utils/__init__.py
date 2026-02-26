@@ -31,7 +31,7 @@ def process_string(input_string):
 
 def get_stream_timestamp():
     # 设置 Nginx-RTMP 的 /stat 页面地址
-    rtmp_stat_url = "http://192.168.1.80:8088/stat"
+    rtmp_stat_url = "http://127.0.0.1:8088/stat"
 
     response = requests.get(rtmp_stat_url)
 
