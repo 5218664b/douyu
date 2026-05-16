@@ -56,3 +56,14 @@ func (p *Playlist) Advance() library.Item {
 func (p *Playlist) History() []library.Item {
 	return append([]library.Item(nil), p.history...)
 }
+
+func (p *Playlist) Select(index int) (library.Item, error) {
+	if index < 1 || index > len(p.items) {
+		return library.Item{}, errors.New("playlist index out of range")
+	}
+
+	current := p.Current()
+	p.history = append(p.history, current)
+	p.current = index - 1
+	return p.Current(), nil
+}

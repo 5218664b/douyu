@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/5218664b/douyu-streamer/internal/config"
+	"github.com/5218664b/douyu-streamer/internal/danmaku"
 	"github.com/5218664b/douyu-streamer/internal/library"
 	"github.com/5218664b/douyu-streamer/internal/playlist"
 	"github.com/5218664b/douyu-streamer/internal/state"
@@ -21,6 +22,7 @@ type Runtime struct {
 	stream  *stream.Manager
 	cancel  context.CancelFunc
 	rootCtx context.Context
+	danmaku *danmaku.Client
 }
 
 func New(cfg config.Config) (*Runtime, error) {
@@ -40,6 +42,9 @@ func New(cfg config.Config) (*Runtime, error) {
 		playlist: queue,
 		stream:   stream.New(cfg.Stream),
 		rootCtx:  context.Background(),
+	}
+	if cfg.Danmaku.Enabled {
+		runtime.danmaku = danmaku.New(cfg.Room.URL, cfg.Danmaku.CommandPrefix, runtime.handleDanmakuCommand)
 	}
 	runtime.syncState("ready")
 
@@ -65,6 +70,11 @@ func (r *Runtime) Start(ctx context.Context) error {
 	r.state.SetProcess(r.stream.Snapshot())
 	r.state.SetStatus("streaming")
 	r.startMonitorLocked()
+	if r.danmaku != nil {
+		if err := r.danmaku.Start(r.rootCtx); err != nil {
+			r.state.SetError(err.Error())
+		}
+	}
 	return nil
 }
 
@@ -93,6 +103,10 @@ func (r *Runtime) Shutdown() error {
 func (r *Runtime) Next(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	return r.nextLocked()
+}
+
+func (r *Runtime) nextLocked() error {
 
 	if err := r.stream.Stop(); err != nil {
 		r.state.SetError(err.Error())
@@ -102,6 +116,31 @@ func (r *Runtime) Next(ctx context.Context) error {
 	r.playlist.Advance()
 	r.syncState("switching")
 
+	if err := r.stream.Start(r.rootCtx, r.playlist.Current()); err != nil {
+		r.state.SetError(err.Error())
+		return err
+	}
+
+	r.state.SetProcess(r.stream.Snapshot())
+	r.state.SetStatus("streaming")
+	return nil
+}
+
+func (r *Runtime) Select(ctx context.Context, index int) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if err := r.stream.Stop(); err != nil {
+		r.state.SetError(err.Error())
+		return err
+	}
+
+	if _, err := r.playlist.Select(index); err != nil {
+		r.state.SetError(err.Error())
+		return err
+	}
+
+	r.syncState("switching")
 	if err := r.stream.Start(r.rootCtx, r.playlist.Current()); err != nil {
 		r.state.SetError(err.Error())
 		return err
@@ -216,6 +255,21 @@ func (r *Runtime) checkStream() {
 	r.state.ClearError()
 	r.state.SetProcess(r.stream.Snapshot())
 	r.state.SetStatus("streaming")
+}
+
+func (r *Runtime) handleDanmakuCommand(cmd string) {
+	switch cmd {
+	case r.cfg.Danmaku.CommandPrefix + "next":
+		_ = r.Next(context.Background())
+		return
+	case r.cfg.Danmaku.CommandPrefix + "reload":
+		_ = r.Reload(context.Background())
+		return
+	}
+
+	if index, ok := danmaku.ParseIndexCommand(cmd, r.cfg.Danmaku.CommandPrefix); ok {
+		_ = r.Select(context.Background(), index)
+	}
 }
 
 func (r *Runtime) scheduleRecoveryLocked(reason string) {

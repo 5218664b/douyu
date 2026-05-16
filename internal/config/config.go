@@ -35,7 +35,8 @@ type StreamConfig struct {
 }
 
 type DanmakuConfig struct {
-	Enabled bool
+	Enabled       bool
+	CommandPrefix string
 }
 
 type APIConfig struct {
@@ -75,6 +76,10 @@ func parse(content []byte) (Config, error) {
 		},
 		API: APIConfig{
 			ListenAddr: "127.0.0.1:8080",
+		},
+		Danmaku: DanmakuConfig{
+			Enabled:       true,
+			CommandPrefix: "#",
 		},
 	}
 
@@ -142,8 +147,11 @@ func parse(content []byte) (Config, error) {
 				cfg.Stream.LoopSingleInput = parseBool(value)
 			}
 		case "danmaku":
-			if key == "enabled" {
+			switch key {
+			case "enabled":
 				cfg.Danmaku.Enabled = parseBool(value)
+			case "command_prefix":
+				cfg.Danmaku.CommandPrefix = value
 			}
 		case "api":
 			if key == "listen_addr" {
@@ -172,6 +180,7 @@ func applyEnv(cfg *Config) {
 	if value, ok := os.LookupEnv("DOUYU_STREAMER_DANMAKU_ENABLED"); ok {
 		cfg.Danmaku.Enabled = parseBool(value)
 	}
+	overrideString(&cfg.Danmaku.CommandPrefix, "DOUYU_STREAMER_DANMAKU_COMMAND_PREFIX")
 	if value, ok := os.LookupEnv("DOUYU_STREAMER_STREAM_COPY_VIDEO"); ok {
 		cfg.Stream.CopyVideo = parseBool(value)
 	}

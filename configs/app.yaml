@@ -17,6 +17,7 @@ stream:
 
 danmaku:
   enabled: true
+  command_prefix: "#"
 
 api:
   listen_addr: "0.0.0.0:8080"
