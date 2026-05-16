@@ -2,6 +2,7 @@ package stream
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -25,6 +26,7 @@ type Manager struct {
 	cmd   *exec.Cmd
 	state ProcessState
 	done  chan error
+	stopRequested bool
 }
 
 func New(cfg config.StreamConfig) *Manager {
@@ -48,6 +50,7 @@ func (m *Manager) Start(ctx context.Context, item library.Item) error {
 	target := buildTarget(m.cfg)
 	m.cmd = cmd
 	m.done = make(chan error, 1)
+	m.stopRequested = false
 	m.state = ProcessState{
 		Running: true,
 		PID:     cmd.Process.Pid,
@@ -74,6 +77,7 @@ func (m *Manager) Stop() error {
 	err := m.cmd.Process.Kill()
 	m.cmd = nil
 	m.done = nil
+	m.stopRequested = true
 	m.state = ProcessState{}
 	return err
 }
@@ -98,6 +102,13 @@ func (m *Manager) Poll() error {
 		m.done = nil
 		m.state.Running = false
 		m.state.PID = 0
+		if m.stopRequested {
+			m.stopRequested = false
+			return nil
+		}
+		if err == nil {
+			return errors.New("stream process exited")
+		}
 		return err
 	default:
 		return nil

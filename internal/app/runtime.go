@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/5218664b/douyu-streamer/internal/config"
 	"github.com/5218664b/douyu-streamer/internal/library"
@@ -18,6 +19,7 @@ type Runtime struct {
 	state   *state.RuntimeState
 	playlist *playlist.Playlist
 	stream  *stream.Manager
+	cancel  context.CancelFunc
 }
 
 func New(cfg config.Config) (*Runtime, error) {
@@ -58,6 +60,7 @@ func (r *Runtime) Start(ctx context.Context) error {
 
 	r.state.SetProcess(r.stream.Snapshot())
 	r.state.SetStatus("streaming")
+	r.startMonitorLocked()
 	return nil
 }
 
@@ -121,4 +124,54 @@ func (r *Runtime) syncState(status string) {
 	r.state.SetPlaylist(r.playlist.Current(), r.playlist.Next(), r.playlist.Items(), r.playlist.History())
 	r.state.SetProcess(r.stream.Snapshot())
 	r.state.SetStatus(status)
+}
+
+func (r *Runtime) startMonitorLocked() {
+	if r.cancel != nil {
+		r.cancel()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	r.cancel = cancel
+
+	go r.monitor(ctx)
+}
+
+func (r *Runtime) monitor(ctx context.Context) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			r.checkStream()
+		}
+	}
+}
+
+func (r *Runtime) checkStream() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	err := r.stream.Poll()
+	r.state.SetProcess(r.stream.Snapshot())
+	if err == nil {
+		return
+	}
+
+	r.state.SetError(err.Error())
+	r.state.SetStatus("recovering")
+
+	restartErr := r.stream.Start(context.Background(), r.playlist.Current())
+	if restartErr != nil {
+		r.state.SetError(restartErr.Error())
+		r.state.SetProcess(r.stream.Snapshot())
+		return
+	}
+
+	r.state.ClearError()
+	r.state.SetProcess(r.stream.Snapshot())
+	r.state.SetStatus("streaming")
 }
