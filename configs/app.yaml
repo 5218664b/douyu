@@ -8,8 +8,8 @@ video:
     - .mp4
 
 stream:
-  rtmp_url: "rtmp://send.example.douyu.com/live"
-  stream_key: "replace-me"
+  rtmp_url: "rtmp://relay:1935/live"
+  stream_key: "input"
   ffmpeg_path: "/usr/bin/ffmpeg"
   copy_video: true
   copy_audio: false

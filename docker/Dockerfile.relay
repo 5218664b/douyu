@@ -1,0 +1,5 @@
+FROM alfg/nginx-rtmp:latest
+
+COPY configs/nginx-rtmp.conf /etc/nginx/nginx.conf.template
+
+CMD ["/bin/sh", "-lc", "envsubst '$$DOUYU_STREAMER_STREAM_RTMP_URL $$DOUYU_STREAMER_STREAM_KEY' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && exec nginx -g 'daemon off;'"]

@@ -1,7 +1,20 @@
 services:
+  relay:
+    image: ${DOUYU_RELAY_IMAGE:-douyu-relay:pi4b}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DOUYU_STREAMER_STREAM_RTMP_URL: ${DOUYU_STREAMER_STREAM_RTMP_URL}
+      DOUYU_STREAMER_STREAM_KEY: ${DOUYU_STREAMER_STREAM_KEY}
+    ports:
+      - "1935:1935"
+
   app:
     image: ${DOUYU_STREAMER_IMAGE:-douyu-streamer:pi4b}
     restart: unless-stopped
+    depends_on:
+      - relay
     env_file:
       - .env
     environment:
@@ -13,8 +26,8 @@ services:
       - ./data/videos:/data/videos:ro
       - ./runtime:/app/runtime
 
-  scan-launcher:
-    image: ${DOUYU_SCAN_IMAGE:-douyu-scan-launcher:pi4b}
+  scan-provider:
+    image: ${DOUYU_SCAN_PROVIDER_IMAGE:-douyu-scan-provider-playwright:pi4b}
     profiles: ["scan"]
     stdin_open: true
     tty: true
