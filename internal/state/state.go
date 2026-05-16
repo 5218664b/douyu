@@ -64,6 +64,12 @@ func (s *RuntimeState) SetError(err string) {
 	s.status = "error"
 }
 
+func (s *RuntimeState) ClearError() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lastError = ""
+}
+
 func (s *RuntimeState) SetProcess(process stream.ProcessState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

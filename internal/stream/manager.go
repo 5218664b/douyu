@@ -24,6 +24,7 @@ type Manager struct {
 	cfg   config.StreamConfig
 	cmd   *exec.Cmd
 	state ProcessState
+	done  chan error
 }
 
 func New(cfg config.StreamConfig) *Manager {
@@ -46,6 +47,7 @@ func (m *Manager) Start(ctx context.Context, item library.Item) error {
 
 	target := buildTarget(m.cfg)
 	m.cmd = cmd
+	m.done = make(chan error, 1)
 	m.state = ProcessState{
 		Running: true,
 		PID:     cmd.Process.Pid,
@@ -53,6 +55,10 @@ func (m *Manager) Start(ctx context.Context, item library.Item) error {
 		Target:  target,
 		Source:  item.Path,
 	}
+
+	go func(proc *exec.Cmd, done chan error) {
+		done <- proc.Wait()
+	}(cmd, m.done)
 
 	return nil
 }
@@ -67,6 +73,7 @@ func (m *Manager) Stop() error {
 
 	err := m.cmd.Process.Kill()
 	m.cmd = nil
+	m.done = nil
 	m.state = ProcessState{}
 	return err
 }
@@ -75,6 +82,26 @@ func (m *Manager) Snapshot() ProcessState {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.state
+}
+
+func (m *Manager) Poll() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.done == nil {
+		return nil
+	}
+
+	select {
+	case err := <-m.done:
+		m.cmd = nil
+		m.done = nil
+		m.state.Running = false
+		m.state.PID = 0
+		return err
+	default:
+		return nil
+	}
 }
 
 func buildArgs(cfg config.StreamConfig, source string) []string {
