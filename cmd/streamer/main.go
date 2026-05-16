@@ -5,6 +5,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/5218664b/douyu-streamer/internal/app"
 	"github.com/5218664b/douyu-streamer/internal/api"
@@ -32,9 +35,32 @@ func main() {
 	}
 
 	server := api.New(runtime)
+	httpServer := &http.Server{
+		Addr:    cfg.API.ListenAddr,
+		Handler: server.Handler(),
+	}
 
 	log.Printf("douyu-streamer starting: room=%s source_dir=%s api=%s", cfg.Room.URL, cfg.Video.SourceDir, cfg.API.ListenAddr)
-	if err := http.ListenAndServe(cfg.API.ListenAddr, server.Handler()); err != nil {
-		log.Fatalf("serve api: %v", err)
+
+	go func() {
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("serve api: %v", err)
+		}
+	}()
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		log.Printf("http shutdown: %v", err)
 	}
+	if err := runtime.Shutdown(); err != nil {
+		log.Fatalf("runtime shutdown: %v", err)
+	}
+
+	log.Printf("douyu-streamer stopped")
 }

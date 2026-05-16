@@ -20,6 +20,7 @@ type Runtime struct {
 	playlist *playlist.Playlist
 	stream  *stream.Manager
 	cancel  context.CancelFunc
+	rootCtx context.Context
 }
 
 func New(cfg config.Config) (*Runtime, error) {
@@ -38,6 +39,7 @@ func New(cfg config.Config) (*Runtime, error) {
 		state:    state.New(cfg.Video.SourceDir, cfg.Danmaku.Enabled),
 		playlist: queue,
 		stream:   stream.New(cfg.Stream),
+		rootCtx:  context.Background(),
 	}
 	runtime.syncState("ready")
 
@@ -52,8 +54,10 @@ func (r *Runtime) Start(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	r.rootCtx = ctx
+
 	r.state.SetStatus("preparing")
-	if err := r.stream.Start(ctx, r.playlist.Current()); err != nil {
+	if err := r.stream.Start(r.rootCtx, r.playlist.Current()); err != nil {
 		r.state.SetError(err.Error())
 		return err
 	}
@@ -61,6 +65,28 @@ func (r *Runtime) Start(ctx context.Context) error {
 	r.state.SetProcess(r.stream.Snapshot())
 	r.state.SetStatus("streaming")
 	r.startMonitorLocked()
+	return nil
+}
+
+func (r *Runtime) Shutdown() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.cancel != nil {
+		r.cancel()
+		r.cancel = nil
+	}
+
+	r.state.SetStatus("stopping")
+	err := r.stream.Stop()
+	r.state.SetProcess(r.stream.Snapshot())
+	if err != nil {
+		r.state.SetError(err.Error())
+		return err
+	}
+
+	r.state.ClearError()
+	r.state.SetStatus("stopped")
 	return nil
 }
 
@@ -76,7 +102,7 @@ func (r *Runtime) Next(ctx context.Context) error {
 	r.playlist.Advance()
 	r.syncState("switching")
 
-	if err := r.stream.Start(ctx, r.playlist.Current()); err != nil {
+	if err := r.stream.Start(r.rootCtx, r.playlist.Current()); err != nil {
 		r.state.SetError(err.Error())
 		return err
 	}
@@ -110,7 +136,7 @@ func (r *Runtime) Reload(ctx context.Context) error {
 	r.playlist = queue
 	r.syncState("reloading")
 
-	if err := r.stream.Start(ctx, r.playlist.Current()); err != nil {
+	if err := r.stream.Start(r.rootCtx, r.playlist.Current()); err != nil {
 		r.state.SetError(err.Error())
 		return err
 	}
@@ -165,10 +191,9 @@ func (r *Runtime) checkStream() {
 		r.playlist.Advance()
 		r.syncState("switching")
 
-		restartErr := r.stream.Start(context.Background(), r.playlist.Current())
+		restartErr := r.stream.Start(r.rootCtx, r.playlist.Current())
 		if restartErr != nil {
-			r.state.SetError(restartErr.Error())
-			r.state.SetProcess(r.stream.Snapshot())
+			r.scheduleRecoveryLocked(restartErr.Error())
 			return
 		}
 
@@ -180,15 +205,51 @@ func (r *Runtime) checkStream() {
 
 	r.state.SetError(err.Err.Error())
 	r.state.SetStatus("recovering")
+	r.state.IncrementRecoveries()
 
-	restartErr := r.stream.Start(context.Background(), r.playlist.Current())
+	restartErr := r.stream.Start(r.rootCtx, r.playlist.Current())
 	if restartErr != nil {
-		r.state.SetError(restartErr.Error())
-		r.state.SetProcess(r.stream.Snapshot())
+		r.scheduleRecoveryLocked(restartErr.Error())
 		return
 	}
 
 	r.state.ClearError()
 	r.state.SetProcess(r.stream.Snapshot())
 	r.state.SetStatus("streaming")
+}
+
+func (r *Runtime) scheduleRecoveryLocked(reason string) {
+	r.state.SetError(reason)
+	r.state.SetProcess(r.stream.Snapshot())
+	go func() {
+		time.Sleep(3 * time.Second)
+		_ = r.retryRecover()
+	}()
+}
+
+func (r *Runtime) retryRecover() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.state.Snapshot().Status == "stopped" {
+		return nil
+	}
+
+	r.state.SetStatus("recovering")
+	r.state.IncrementRecoveries()
+
+	if err := r.stream.Start(r.rootCtx, r.playlist.Current()); err != nil {
+		r.state.SetError(err.Error())
+		r.state.SetProcess(r.stream.Snapshot())
+		go func() {
+			time.Sleep(3 * time.Second)
+			_ = r.retryRecover()
+		}()
+		return err
+	}
+
+	r.state.ClearError()
+	r.state.SetProcess(r.stream.Snapshot())
+	r.state.SetStatus("streaming")
+	return nil
 }

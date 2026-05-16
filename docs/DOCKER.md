@@ -25,5 +25,6 @@ Current bootstrap behavior:
 - builds a sequential in-memory playlist from supported file extensions
 - starts a single `ffmpeg` process for the current media item
 - advances to the next item after normal media completion
-- watches the `ffmpeg` process and attempts to restart the current item after unexpected exit
+- watches the `ffmpeg` process and attempts repeated restart of the current item after unexpected exit
+- handles container stop signals and shuts down the child `ffmpeg` process cleanly
 - exposes `/healthz`, `/state`, `/next`, and `/reload` on the local API

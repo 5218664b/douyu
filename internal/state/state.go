@@ -18,6 +18,7 @@ type RuntimeState struct {
 	sourceDir   string
 	danmakuOn   bool
 	process     stream.ProcessState
+	recoveries  int
 }
 
 type Snapshot struct {
@@ -30,6 +31,7 @@ type Snapshot struct {
 	SourceDir string         `json:"source_dir"`
 	DanmakuOn bool           `json:"danmaku_enabled"`
 	Process   stream.ProcessState `json:"process"`
+	Recoveries int          `json:"recoveries"`
 }
 
 func New(sourceDir string, danmakuOn bool) *RuntimeState {
@@ -76,6 +78,12 @@ func (s *RuntimeState) SetProcess(process stream.ProcessState) {
 	s.process = process
 }
 
+func (s *RuntimeState) IncrementRecoveries() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.recoveries++
+}
+
 func (s *RuntimeState) Snapshot() Snapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -90,6 +98,7 @@ func (s *RuntimeState) Snapshot() Snapshot {
 		SourceDir: s.sourceDir,
 		DanmakuOn: s.danmakuOn,
 		Process:   s.process,
+		Recoveries: s.recoveries,
 	}
 }
 
