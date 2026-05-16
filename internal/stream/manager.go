@@ -20,12 +20,26 @@ type ProcessState struct {
 	Source  string `json:"source,omitempty"`
 }
 
+type ExitReason string
+
+const (
+	ExitReasonNone      ExitReason = ""
+	ExitReasonStopped   ExitReason = "stopped"
+	ExitReasonCompleted ExitReason = "completed"
+	ExitReasonFailed    ExitReason = "failed"
+)
+
+type ExitEvent struct {
+	Reason ExitReason
+	Err    error
+}
+
 type Manager struct {
 	mu    sync.RWMutex
 	cfg   config.StreamConfig
 	cmd   *exec.Cmd
 	state ProcessState
-	done  chan error
+	done  chan ExitEvent
 	stopRequested bool
 }
 
@@ -49,7 +63,7 @@ func (m *Manager) Start(ctx context.Context, item library.Item) error {
 
 	target := buildTarget(m.cfg)
 	m.cmd = cmd
-	m.done = make(chan error, 1)
+	m.done = make(chan ExitEvent, 1)
 	m.stopRequested = false
 	m.state = ProcessState{
 		Running: true,
@@ -59,8 +73,13 @@ func (m *Manager) Start(ctx context.Context, item library.Item) error {
 		Source:  item.Path,
 	}
 
-	go func(proc *exec.Cmd, done chan error) {
-		done <- proc.Wait()
+	go func(proc *exec.Cmd, done chan ExitEvent) {
+		err := proc.Wait()
+		if err == nil {
+			done <- ExitEvent{Reason: ExitReasonCompleted}
+			return
+		}
+		done <- ExitEvent{Reason: ExitReasonFailed, Err: err}
 	}(cmd, m.done)
 
 	return nil
@@ -88,30 +107,33 @@ func (m *Manager) Snapshot() ProcessState {
 	return m.state
 }
 
-func (m *Manager) Poll() error {
+func (m *Manager) Poll() ExitEvent {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.done == nil {
-		return nil
+		return ExitEvent{}
 	}
 
 	select {
-	case err := <-m.done:
+	case event := <-m.done:
 		m.cmd = nil
 		m.done = nil
 		m.state.Running = false
 		m.state.PID = 0
 		if m.stopRequested {
 			m.stopRequested = false
-			return nil
+			return ExitEvent{Reason: ExitReasonStopped}
 		}
-		if err == nil {
-			return errors.New("stream process exited")
+		if event.Reason == ExitReasonCompleted {
+			return event
 		}
-		return err
+		if event.Err == nil {
+			event.Err = errors.New("stream process exited")
+		}
+		return event
 	default:
-		return nil
+		return ExitEvent{}
 	}
 }
 
@@ -120,9 +142,11 @@ func buildArgs(cfg config.StreamConfig, source string) []string {
 		"-hide_banner",
 		"-loglevel", "warning",
 		"-re",
-		"-stream_loop", "-1",
-		"-i", source,
 	}
+	if cfg.LoopSingleInput {
+		args = append(args, "-stream_loop", "-1")
+	}
+	args = append(args, "-i", source)
 
 	if cfg.CopyVideo {
 		args = append(args, "-c:v", "copy")

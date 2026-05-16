@@ -157,11 +157,28 @@ func (r *Runtime) checkStream() {
 
 	err := r.stream.Poll()
 	r.state.SetProcess(r.stream.Snapshot())
-	if err == nil {
+	if err.Reason == stream.ExitReasonNone || err.Reason == stream.ExitReasonStopped {
 		return
 	}
 
-	r.state.SetError(err.Error())
+	if err.Reason == stream.ExitReasonCompleted {
+		r.playlist.Advance()
+		r.syncState("switching")
+
+		restartErr := r.stream.Start(context.Background(), r.playlist.Current())
+		if restartErr != nil {
+			r.state.SetError(restartErr.Error())
+			r.state.SetProcess(r.stream.Snapshot())
+			return
+		}
+
+		r.state.ClearError()
+		r.state.SetProcess(r.stream.Snapshot())
+		r.state.SetStatus("streaming")
+		return
+	}
+
+	r.state.SetError(err.Err.Error())
 	r.state.SetStatus("recovering")
 
 	restartErr := r.stream.Start(context.Background(), r.playlist.Current())

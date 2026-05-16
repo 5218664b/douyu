@@ -24,5 +24,6 @@ Current bootstrap behavior:
 - scans the mounted media directory on startup
 - builds a sequential in-memory playlist from supported file extensions
 - starts a single `ffmpeg` process for the current media item
+- advances to the next item after normal media completion
 - watches the `ffmpeg` process and attempts to restart the current item after unexpected exit
 - exposes `/healthz`, `/state`, `/next`, and `/reload` on the local API
