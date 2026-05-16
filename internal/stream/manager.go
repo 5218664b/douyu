@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -98,6 +99,9 @@ func (m *Manager) Stop() error {
 	m.done = nil
 	m.stopRequested = true
 	m.state = ProcessState{}
+	if errors.Is(err, os.ErrProcessDone) {
+		return nil
+	}
 	return err
 }
 
