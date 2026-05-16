@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/5218664b/douyu-streamer/internal/library"
+	"github.com/5218664b/douyu-streamer/internal/stream"
 )
 
 type RuntimeState struct {
@@ -16,6 +17,7 @@ type RuntimeState struct {
 	lastError   string
 	sourceDir   string
 	danmakuOn   bool
+	process     stream.ProcessState
 }
 
 type Snapshot struct {
@@ -27,6 +29,7 @@ type Snapshot struct {
 	LastError string         `json:"last_error,omitempty"`
 	SourceDir string         `json:"source_dir"`
 	DanmakuOn bool           `json:"danmaku_enabled"`
+	Process   stream.ProcessState `json:"process"`
 }
 
 func New(sourceDir string, danmakuOn bool) *RuntimeState {
@@ -58,6 +61,13 @@ func (s *RuntimeState) SetError(err string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.lastError = err
+	s.status = "error"
+}
+
+func (s *RuntimeState) SetProcess(process stream.ProcessState) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.process = process
 }
 
 func (s *RuntimeState) Snapshot() Snapshot {
@@ -73,6 +83,7 @@ func (s *RuntimeState) Snapshot() Snapshot {
 		LastError: s.lastError,
 		SourceDir: s.sourceDir,
 		DanmakuOn: s.danmakuOn,
+		Process:   s.process,
 	}
 }
 

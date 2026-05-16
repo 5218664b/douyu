@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"github.com/5218664b/douyu-streamer/internal/library"
 	"github.com/5218664b/douyu-streamer/internal/playlist"
 	"github.com/5218664b/douyu-streamer/internal/state"
+	"github.com/5218664b/douyu-streamer/internal/stream"
 )
 
 func main() {
@@ -35,6 +37,15 @@ func main() {
 
 	runtime := state.New(cfg.Video.SourceDir, cfg.Danmaku.Enabled)
 	runtime.SetPlaylist(queue.Current(), queue.Next(), queue.Items(), queue.History())
+	runtime.SetStatus("preparing")
+
+	streamManager := stream.New(cfg.Stream)
+	if err := streamManager.Start(context.Background(), queue.Current()); err != nil {
+		runtime.SetError(err.Error())
+		log.Fatalf("start stream: %v", err)
+	}
+	runtime.SetProcess(streamManager.Snapshot())
+	runtime.SetStatus("streaming")
 
 	server := api.New(runtime)
 

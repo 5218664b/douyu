@@ -11,9 +11,11 @@ stream:
   rtmp_url: "rtmp://send.example.douyu.com/live"
   stream_key: "replace-me"
   ffmpeg_path: "/usr/bin/ffmpeg"
+  copy_video: true
+  copy_audio: false
 
 danmaku:
   enabled: true
 
 api:
-  listen_addr: "127.0.0.1:8080"
+  listen_addr: "0.0.0.0:8080"

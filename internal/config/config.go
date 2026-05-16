@@ -29,6 +29,8 @@ type StreamConfig struct {
 	RTMPURL    string
 	StreamKey  string
 	FFmpegPath string
+	CopyVideo  bool
+	CopyAudio  bool
 }
 
 type DanmakuConfig struct {
@@ -66,6 +68,8 @@ func parse(content []byte) (Config, error) {
 		},
 		Stream: StreamConfig{
 			FFmpegPath: "/usr/bin/ffmpeg",
+			CopyVideo:  true,
+			CopyAudio:  false,
 		},
 		API: APIConfig{
 			ListenAddr: "127.0.0.1:8080",
@@ -125,6 +129,10 @@ func parse(content []byte) (Config, error) {
 				cfg.Stream.StreamKey = value
 			case "ffmpeg_path":
 				cfg.Stream.FFmpegPath = value
+			case "copy_video":
+				cfg.Stream.CopyVideo = parseBool(value)
+			case "copy_audio":
+				cfg.Stream.CopyAudio = parseBool(value)
 			}
 		case "danmaku":
 			if key == "enabled" {
@@ -156,6 +164,12 @@ func applyEnv(cfg *Config) {
 
 	if value, ok := os.LookupEnv("DOUYU_STREAMER_DANMAKU_ENABLED"); ok {
 		cfg.Danmaku.Enabled = parseBool(value)
+	}
+	if value, ok := os.LookupEnv("DOUYU_STREAMER_STREAM_COPY_VIDEO"); ok {
+		cfg.Stream.CopyVideo = parseBool(value)
+	}
+	if value, ok := os.LookupEnv("DOUYU_STREAMER_STREAM_COPY_AUDIO"); ok {
+		cfg.Stream.CopyAudio = parseBool(value)
 	}
 }
 
