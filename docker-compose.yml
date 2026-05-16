@@ -5,8 +5,10 @@ services:
       dockerfile: docker/Dockerfile
     container_name: douyu-streamer
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      DOUYU_STREAMER_CONFIG: /app/configs/app.yaml
+      DOUYU_STREAMER_CONFIG: ${DOUYU_STREAMER_CONFIG:-/app/configs/app.yaml}
     ports:
       - "127.0.0.1:8080:8080"
     volumes:

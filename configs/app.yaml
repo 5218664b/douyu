@@ -2,7 +2,7 @@ room:
   url: "https://www.douyu.com/9163452"
 
 video:
-  source_dir: "/srv/douyu-streamer/videos"
+  source_dir: "/data/videos"
   formats:
     - .ts
     - .mp4

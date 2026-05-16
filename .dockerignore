@@ -1,6 +1,6 @@
+.git
 node_modules
 __pycache__
-.env
 bin
 data/videos/*
 !data/videos/.gitkeep
