@@ -1,0 +1,19 @@
+room:
+  url: "https://www.douyu.com/9163452"
+
+video:
+  source_dir: "/srv/douyu-streamer/videos"
+  formats:
+    - .ts
+    - .mp4
+
+stream:
+  rtmp_url: "rtmp://send.example.douyu.com/live"
+  stream_key: "replace-me"
+  ffmpeg_path: "/usr/bin/ffmpeg"
+
+danmaku:
+  enabled: true
+
+api:
+  listen_addr: "127.0.0.1:8080"

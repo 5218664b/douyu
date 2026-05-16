@@ -1,0 +1,15 @@
+[Unit]
+Description=Douyu Streamer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/douyu-streamer
+Environment=DOUYU_STREAMER_CONFIG=/opt/douyu-streamer/configs/app.yaml
+ExecStart=/opt/douyu-streamer/bin/douyu-streamer
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
