@@ -1,0 +1,14 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: douyu-streamer
+    restart: unless-stopped
+    environment:
+      DOUYU_STREAMER_CONFIG: /app/configs/app.yaml
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./configs/app.yaml:/app/configs/app.yaml:ro
+      - ./data/videos:/data/videos:ro
