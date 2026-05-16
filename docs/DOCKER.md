@@ -3,12 +3,27 @@
 This project is designed to run on Raspberry Pi 4B as a single Docker
 container. The app binary and `ffmpeg` live in the same image.
 
-Expected workflow:
+Recommended workflow for Raspberry Pi:
 
 ```bash
 cp .env.example .env
-docker compose build
+docker load -i douyu-streamer-pi4b.tar
 docker compose up -d
+```
+
+Recommended image build workflow on a stronger local machine:
+
+```bash
+docker buildx build --platform linux/arm64 -t douyu-streamer-base:pi4b --load -f docker/Dockerfile.base .
+docker buildx build --platform linux/arm64 -t douyu-streamer:pi4b --load -f docker/Dockerfile .
+docker save douyu-streamer:pi4b -o douyu-streamer-pi4b.tar
+```
+
+If you want to reuse the preinstalled `ffmpeg` layer across frequent app builds,
+build and export the base image too:
+
+```bash
+docker save douyu-streamer-base:pi4b -o douyu-streamer-base-pi4b.tar
 ```
 
 Runtime inputs:

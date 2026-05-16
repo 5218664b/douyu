@@ -1,9 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    container_name: douyu-streamer
+    image: ${DOUYU_STREAMER_IMAGE:-douyu-streamer:pi4b}
     restart: unless-stopped
     env_file:
       - .env

@@ -8,13 +8,8 @@ COPY internal ./internal
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /out/douyu-streamer ./cmd/streamer
 
-FROM debian:bookworm-slim
-
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ffmpeg ca-certificates \
-	&& rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
+ARG DOUYU_STREAMER_BASE_IMAGE=douyu-streamer-base:pi4b
+FROM ${DOUYU_STREAMER_BASE_IMAGE}
 
 COPY --from=builder /out/douyu-streamer /app/douyu-streamer
 COPY configs/app.yaml /app/configs/app.yaml

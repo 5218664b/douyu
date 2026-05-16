@@ -87,6 +87,12 @@ func parse(content []byte) (Config, error) {
 			continue
 		}
 
+		if section == "video" && line == "formats:" {
+			cfg.Video.Formats = nil
+			inVideoFormats = true
+			continue
+		}
+
 		if strings.HasSuffix(line, ":") && !strings.HasPrefix(line, "- ") {
 			section = strings.TrimSuffix(line, ":")
 			inVideoFormats = false
@@ -119,9 +125,6 @@ func parse(content []byte) (Config, error) {
 			switch key {
 			case "source_dir":
 				cfg.Video.SourceDir = value
-			case "formats":
-				cfg.Video.Formats = nil
-				inVideoFormats = true
 			}
 		case "stream":
 			switch key {
