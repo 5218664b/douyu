@@ -40,7 +40,14 @@ func main() {
 		Handler: server.Handler(),
 	}
 
-	log.Printf("douyu-streamer starting: room=%s source_dir=%s api=%s", cfg.Room.URL, cfg.Video.SourceDir, cfg.API.ListenAddr)
+	log.Printf(
+		"douyu-streamer starting: room=%s source_dir=%s api=%s stream_target=%s/%s",
+		cfg.Room.URL,
+		cfg.Video.SourceDir,
+		cfg.API.ListenAddr,
+		cfg.Stream.RTMPURL,
+		cfg.Stream.StreamKey,
+	)
 
 	go func() {
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {

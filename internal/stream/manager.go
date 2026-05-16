@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -58,6 +59,8 @@ func (m *Manager) Start(ctx context.Context, item library.Item) error {
 
 	args := buildArgs(m.cfg, item.Path)
 	cmd := exec.CommandContext(ctx, m.cfg.FFmpegPath, args...)
+	cmd.Stdout = log.Writer()
+	cmd.Stderr = log.Writer()
 	if err := cmd.Start(); err != nil {
 		return err
 	}
@@ -144,7 +147,7 @@ func (m *Manager) Poll() ExitEvent {
 func buildArgs(cfg config.StreamConfig, source string) []string {
 	args := []string{
 		"-hide_banner",
-		"-loglevel", "warning",
+		"-loglevel", cfg.FFmpegLogLevel,
 		"-re",
 	}
 	if cfg.LoopSingleInput {

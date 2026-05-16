@@ -11,6 +11,7 @@ stream:
   rtmp_url: "rtmp://relay:1935/live"
   stream_key: "input"
   ffmpeg_path: "/usr/bin/ffmpeg"
+  ffmpeg_loglevel: "warning"
   copy_video: true
   copy_audio: false
   loop_single_input: false

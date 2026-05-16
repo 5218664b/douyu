@@ -29,6 +29,7 @@ type StreamConfig struct {
 	RTMPURL    string
 	StreamKey  string
 	FFmpegPath string
+	FFmpegLogLevel string
 	CopyVideo  bool
 	CopyAudio  bool
 	LoopSingleInput bool
@@ -70,6 +71,7 @@ func parse(content []byte) (Config, error) {
 		},
 		Stream: StreamConfig{
 			FFmpegPath: "/usr/bin/ffmpeg",
+			FFmpegLogLevel: "warning",
 			CopyVideo:  true,
 			CopyAudio:  false,
 			LoopSingleInput: false,
@@ -139,6 +141,8 @@ func parse(content []byte) (Config, error) {
 				cfg.Stream.StreamKey = value
 			case "ffmpeg_path":
 				cfg.Stream.FFmpegPath = value
+			case "ffmpeg_loglevel":
+				cfg.Stream.FFmpegLogLevel = value
 			case "copy_video":
 				cfg.Stream.CopyVideo = parseBool(value)
 			case "copy_audio":
@@ -175,6 +179,7 @@ func applyEnv(cfg *Config) {
 	overrideString(&cfg.Stream.RTMPURL, "DOUYU_STREAMER_STREAM_RTMP_URL")
 	overrideString(&cfg.Stream.StreamKey, "DOUYU_STREAMER_STREAM_KEY")
 	overrideString(&cfg.Stream.FFmpegPath, "DOUYU_STREAMER_FFMPEG_PATH")
+	overrideString(&cfg.Stream.FFmpegLogLevel, "DOUYU_STREAMER_FFMPEG_LOGLEVEL")
 	overrideString(&cfg.API.ListenAddr, "DOUYU_STREAMER_API_LISTEN_ADDR")
 
 	if value, ok := os.LookupEnv("DOUYU_STREAMER_DANMAKU_ENABLED"); ok {
@@ -204,6 +209,8 @@ func validate(cfg Config) error {
 		return errors.New("stream.stream_key is required")
 	case cfg.Stream.FFmpegPath == "":
 		return errors.New("stream.ffmpeg_path is required")
+	case cfg.Stream.FFmpegLogLevel == "":
+		return errors.New("stream.ffmpeg_loglevel is required")
 	}
 
 	return nil

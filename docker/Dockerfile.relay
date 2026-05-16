@@ -1,5 +1,7 @@
-FROM alfg/nginx-rtmp:latest
+FROM tiangolo/nginx-rtmp:latest
 
-COPY configs/nginx-rtmp.conf /etc/nginx/nginx.conf.template
+COPY docker/relay-entrypoint.sh /usr/local/bin/relay-entrypoint.sh
 
-CMD ["/bin/sh", "-lc", "envsubst '$$DOUYU_STREAMER_STREAM_RTMP_URL $$DOUYU_STREAMER_STREAM_KEY' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && exec nginx -g 'daemon off;'"]
+RUN chmod +x /usr/local/bin/relay-entrypoint.sh
+
+CMD ["/usr/local/bin/relay-entrypoint.sh"]

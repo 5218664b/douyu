@@ -4,7 +4,7 @@ This document describes the scan-to-start workflow for `douyu-streamer`.
 
 ## Goal
 
-Provide a separate launcher that:
+Provide a lightweight launcher plus an optional scan provider that:
 
 1. opens a Douyu login flow
 2. waits for QR-code scan
@@ -23,12 +23,14 @@ docker/
 runtime/
   stream.env
 scripts/
+  start.sh
+  scan_and_start.sh
   start_with_scan.sh
 ```
 
 ## Current status
 
-An initial Playwright implementation is in place.
+An initial Playwright scan provider is in place.
 
 Current behavior:
 
@@ -42,6 +44,12 @@ Current behavior:
 - writes them to `runtime/stream.env`
 - starts `bin/douyu-streamer` with exported runtime variables
 
+The default local wrapper no longer installs Node dependencies at runtime.
+It expects either:
+
+- the scan-provider container to be used, or
+- `tools/scan-launcher/node_modules` to have been prepared in advance
+
 ## Container-first requirements
 
 Preferred runtime:
@@ -49,7 +57,7 @@ Preferred runtime:
 - Docker
 - `docker compose`
 
-The launcher container carries:
+The optional scan-provider container carries:
 
 - Node.js
 - Playwright
@@ -72,14 +80,33 @@ For direct Pi usage, the intended mode is:
 
 ## Suggested flow
 
-Build the launcher image:
+Build the scan-provider image:
 
 ```bash
-docker buildx build --platform linux/arm64 -t douyu-scan-launcher:pi4b --load -f docker/Dockerfile.scan-launcher .
+docker buildx build --platform linux/arm64 -t douyu-scan-provider-playwright:pi4b --load -f docker/Dockerfile.scan-launcher .
 ```
 
-Run the scan profile:
+Run the optional scan profile:
 
 ```bash
-docker compose --profile scan run --rm scan-launcher
+docker compose --profile scan run --rm scan-provider
+```
+
+Default local startup path:
+
+```bash
+scripts/start.sh
+```
+
+If `runtime/stream.env` is not present yet, use:
+
+```bash
+scripts/scan_and_start.sh
+```
+
+For local Node-based use, prepare dependencies once:
+
+```bash
+cd tools/scan-launcher
+npm install
 ```

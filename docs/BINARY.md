@@ -68,6 +68,13 @@ into it instead of rebuilding or reloading the whole image:
 PI_HOST=pi@<pi-ip> ./scripts/push_pi_binary.sh
 ```
 
+For password-based SSH environments:
+
+```bash
+./scripts/build_pi_binary.sh
+PI_HOST=pi@<pi-ip> PI_PASSWORD='<password>' ./scripts/push_pi_binary.sh
+```
+
 Defaults used by the helper script:
 
 - remote directory: `/home/pi/douyu-rebuild`
@@ -78,6 +85,7 @@ You can override them:
 
 ```bash
 PI_HOST=pi@<pi-ip> \
+PI_PASSWORD='<password>' \
 REMOTE_DIR=/home/pi/douyu-rebuild \
 CONTAINER_NAME=douyu-rebuild-app-1 \
 SYNC_CONFIG=0 \

@@ -22,9 +22,11 @@ async function decodeQrFromBuffer(buffer) {
 }
 
 async function writeRuntimeEnv(rtmpUrl, streamKey) {
+  const relayForwardUrl = `${rtmpUrl.replace(/\/+$/, "")}/${streamKey}`;
   const lines = [
     `DOUYU_STREAMER_STREAM_RTMP_URL=${rtmpUrl}`,
-    `DOUYU_STREAMER_STREAM_KEY=${streamKey}`
+    `DOUYU_STREAMER_STREAM_KEY=${streamKey}`,
+    `DOUYU_RELAY_FORWARD_URL=${relayForwardUrl}`
   ];
 
   await fs.writeFile(outputPath, `${lines.join("\n")}\n`, "utf8");

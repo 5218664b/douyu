@@ -5,11 +5,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"crypto/tls"
 
 	"github.com/gorilla/websocket"
 )
@@ -38,11 +41,38 @@ func (c *Client) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("danmaku: resolved room id=%s from %s", roomID, c.roomURL)
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, wsURL, nil)
+	dialer := *websocket.DefaultDialer
+	dialer.TLSClientConfig = &tls.Config{
+		ServerName: "danmuproxy.douyu.com",
+		MinVersion: tls.VersionTLS12,
+		MaxVersion: tls.VersionTLS12,
+		CipherSuites: []uint16{
+			tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+			tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+		},
+	}
+	dialer.HandshakeTimeout = 15 * time.Second
+
+	headers := http.Header{}
+	headers.Set("Origin", "https://www.douyu.com")
+	headers.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36")
+	headers.Set("Pragma", "no-cache")
+	headers.Set("Cache-Control", "no-cache")
+
+	conn, resp, err := dialer.DialContext(ctx, wsURL, headers)
 	if err != nil {
+		if resp != nil {
+			log.Printf("danmaku: websocket handshake response status=%s headers=%v", resp.Status, resp.Header)
+		}
 		return err
 	}
+	log.Printf("danmaku: connected websocket %s", wsURL)
 
 	if err := writePacket(conn, fmt.Sprintf("type@=loginreq/roomid@=%s/", roomID)); err != nil {
 		_ = conn.Close()
@@ -66,6 +96,7 @@ func (c *Client) heartbeat(ctx context.Context, conn *websocket.Conn) {
 	for {
 		select {
 		case <-ctx.Done():
+			log.Printf("danmaku: heartbeat loop stopped")
 			return
 		case <-ticker.C:
 			_ = writeRaw(conn, []byte{0x14, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0xb1, 0x02, 0x00, 0x00, 0x74, 0x79, 0x70, 0x65, 0x40, 0x3d, 0x6d, 0x72, 0x6b, 0x6c, 0x2f, 0x00})
@@ -79,17 +110,20 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) {
 	for {
 		select {
 		case <-ctx.Done():
+			log.Printf("danmaku: read loop stopped")
 			return
 		default:
 		}
 
 		_, data, err := conn.ReadMessage()
 		if err != nil {
+			log.Printf("danmaku: read message failed: %v", err)
 			return
 		}
 
 		for _, msg := range decodeMessages(data) {
 			if strings.HasPrefix(msg, c.prefix) {
+				log.Printf("danmaku: command received: %s", strings.TrimSpace(msg))
 				c.onCmd(strings.TrimSpace(msg))
 			}
 		}
@@ -97,6 +131,10 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) {
 }
 
 func resolveRoomID(ctx context.Context, roomURL string) (string, error) {
+	if fromURL := roomIDFromURL(roomURL); fromURL != "" {
+		return fromURL, nil
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, roomURL, nil)
 	if err != nil {
 		return "", err
@@ -113,11 +151,26 @@ func resolveRoomID(ctx context.Context, roomURL string) (string, error) {
 		return "", err
 	}
 
-	match := regexp.MustCompile(`\\$ROOM\\.room_id\\s*=\\s*(\\d+)`).FindStringSubmatch(string(body))
+	match := regexp.MustCompile(`\$ROOM\.room_id\s*=\s*(\d+)`).FindStringSubmatch(string(body))
 	if len(match) != 2 {
 		return "", fmt.Errorf("failed to resolve douyu room id from %s", roomURL)
 	}
 	return match[1], nil
+}
+
+func roomIDFromURL(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	segment := strings.Trim(strings.TrimSpace(parsed.Path), "/")
+	if segment == "" {
+		return ""
+	}
+	if _, err := strconv.Atoi(segment); err == nil {
+		return segment
+	}
+	return ""
 }
 
 func writePacket(conn *websocket.Conn, payload string) error {
@@ -139,9 +192,12 @@ func writeRaw(conn *websocket.Conn, data []byte) error {
 
 func decodeMessages(data []byte) []string {
 	raw := string(data)
-	parts := regexp.MustCompile(`type@=.*?\\x00`).FindAllString(raw, -1)
 	var out []string
-	for _, part := range parts {
+	for _, part := range strings.Split(raw, "\x00") {
+		if !strings.Contains(part, "type@=") {
+			continue
+		}
+
 		msgType := extractField(part, "type")
 		if msgType != "chatmsg" {
 			continue
