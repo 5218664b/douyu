@@ -1,6 +1,0 @@
-ARG DOUYU_SCAN_RUNTIME_IMAGE=douyu-scan-provider-node:hotfix
-FROM ${DOUYU_SCAN_RUNTIME_IMAGE}
-
-WORKDIR /app
-
-CMD ["npm", "run", "start"]

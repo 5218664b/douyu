@@ -19,14 +19,13 @@ tools/scan-launcher/
   start.js
 docker/
   Dockerfile.scan-launcher
-  Dockerfile.scan-launcher-dev
-  Dockerfile.scan-launcher-runtime
 runtime/
   stream.env
 scripts/
-  start.sh
-  scan_and_start.sh
-  start_with_scan.sh
+  dev/menu.sh
+  dev/scan_start_pi.sh
+  dev/push_restart_scan_provider.sh
+  pi/scan_start.sh
 ```
 
 ## Current status
@@ -45,13 +44,8 @@ Current behavior:
 - writes them to `runtime/stream.env`
 - starts `bin/douyu-streamer` with exported runtime variables
 
-The default local wrapper prefers `npm run start` inside `tools/scan-launcher`
-when dependencies are installed locally.
-
-It otherwise expects either:
-
-- the scan-provider container to be used, or
-- Node.js dependencies to be installed locally
+The preferred workflows now target Raspberry Pi deployment or direct local
+execution inside `tools/scan-launcher`.
 
 ## Container-first requirements
 
@@ -65,12 +59,6 @@ The optional scan-provider container carries:
 - Node.js
 - Puppeteer
 - Chromium runtime
-
-`Dockerfile.scan-launcher-dev` is the debug-friendly variant:
-
-- `FROM douyu-scan-provider-node:hotfix`
-- copy the latest launcher sources into the runtime image
-- reuse the preinstalled runtime dependencies from the base image
 
 Optional environment variables:
 
@@ -104,14 +92,17 @@ docker compose --profile scan run --rm scan-provider
 Default local startup path:
 
 ```bash
-scripts/start.sh
+cd tools/scan-launcher
+npm run start
 ```
 
 If `runtime/stream.env` is not present yet, use:
 
 ```bash
-scripts/scan_and_start.sh
+./scripts/dev/menu.sh
 ```
+
+Then choose `1` to start the QR-scan flow on Raspberry Pi from your host machine.
 
 For local Node.js-based use:
 
@@ -119,4 +110,10 @@ For local Node.js-based use:
 cd tools/scan-launcher
 npm install
 npm run start
+```
+
+For Raspberry Pi local use directly on the device:
+
+```bash
+./scripts/pi/scan_start.sh
 ```

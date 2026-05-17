@@ -32,6 +32,23 @@ const roomUrl = process.env.DOUYU_SCAN_ROOM_URL || "https://www.douyu.com/creato
 const browserPath =
   process.env.DOUYU_SCAN_BROWSER_PATH || "/usr/bin/chromium" || "/usr/bin/chromium-browser";
 const headless = String(process.env.DOUYU_SCAN_HEADLESS || "true").toLowerCase() !== "false";
+const blockedResourceTypes = new Set(["image", "font", "media", "manifest"]);
+const blockedURLPatterns = [
+  "googlesyndication",
+  "doubleclick.net",
+  "google-analytics.com",
+  "googletagmanager.com",
+  "googleadservices.com",
+  "adsystem",
+  "hm.baidu.com",
+  "cnzz.com",
+  "umeng.com",
+  "sentry",
+  "slardar",
+  "metrics",
+  "tracker",
+  "beacon"
+];
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -123,7 +140,12 @@ async function run() {
 
     await page.setRequestInterception(true);
     page.on("request", (request) => {
-      if (request.resourceType() === "image") {
+      const resourceType = request.resourceType();
+      const requestURL = request.url().toLowerCase();
+      const shouldBlockByType = blockedResourceTypes.has(resourceType);
+      const shouldBlockByURL = blockedURLPatterns.some((pattern) => requestURL.includes(pattern));
+
+      if (shouldBlockByType || shouldBlockByURL) {
         request.abort().catch(() => {});
         return;
       }

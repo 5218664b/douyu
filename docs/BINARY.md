@@ -8,8 +8,10 @@ This project supports a fast Raspberry Pi validation workflow based on a single
 Use the unified helper script:
 
 ```bash
-./scripts/push_restart_app.sh
+./scripts/dev/menu.sh
 ```
+
+Then choose `2` to update and restart the Raspberry Pi app only.
 
 This script will:
 
@@ -44,11 +46,11 @@ Prefer Docker when:
 
 ## Fast binary refresh into a running container
 
-`push_restart_app.sh` assumes the container already exists on the Pi and updates
+`scripts/dev/push_restart_app.sh` assumes the container already exists on the Pi and updates
 it in place instead of rebuilding or reloading the whole image.
 
 ```bash
-./scripts/push_restart_app.sh
+./scripts/dev/push_restart_app.sh
 ```
 
 Defaults baked into the helper script:
@@ -62,7 +64,7 @@ Defaults baked into the helper script:
 Optional overrides:
 
 ```bash
-SYNC_CONFIG=0 ./scripts/push_restart_app.sh
-APP_CONTAINER_NAME=another-app-container ./scripts/push_restart_app.sh
-APP_BUILDER_IMAGE=golang:1.22-bookworm ./scripts/push_restart_app.sh
+SYNC_CONFIG=0 ./scripts/dev/push_restart_app.sh
+APP_CONTAINER_NAME=another-app-container ./scripts/dev/push_restart_app.sh
+APP_BUILDER_IMAGE=golang:1.22-bookworm ./scripts/dev/push_restart_app.sh
 ```

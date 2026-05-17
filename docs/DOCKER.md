@@ -27,22 +27,28 @@ docker save douyu-streamer:pi4b -o douyu-streamer-pi4b.tar
 Recommended Pi image push workflow:
 
 ```bash
-PI_PASSWORD='x' ./scripts/push_pi_app_image.sh
-PI_PASSWORD='x' ./scripts/push_pi_relay_image.sh
-PI_PASSWORD='x' ./scripts/push_pi_scan_image.sh
+./scripts/dev/menu.sh
+```
+
+If you prefer the direct scripts, use:
+
+```bash
+PI_PASSWORD='x' ./scripts/dev/push_pi_app_image.sh
+PI_PASSWORD='x' ./scripts/dev/push_pi_relay_image.sh
+PI_PASSWORD='x' ./scripts/dev/push_pi_scan_image.sh
 ```
 
 For a full release-style refresh, use:
 
 ```bash
-PI_PASSWORD='x' ./scripts/release_pi_images.sh
+PI_PASSWORD='x' ./scripts/dev/release_pi_images.sh
 ```
 
 For relay, the preferred deployment flow is:
 
 ```bash
-PI_PASSWORD='x' ./scripts/push_pi_relay_image.sh
-./scripts/push_restart_relay.sh
+PI_PASSWORD='x' ./scripts/dev/push_pi_relay_image.sh
+./scripts/dev/push_restart_relay.sh
 ```
 
 If you want to reuse the preinstalled `ffmpeg` layer across frequent app builds,
@@ -73,8 +79,7 @@ The scan provider writes `runtime/stream.env`. The normal `app` and `relay` cont
 separate from this browser automation step.
 
 If you run the scan flow locally instead of in Docker, install the Node.js
-dependencies in `tools/scan-launcher` and let `scripts/scan_and_start.sh`
-invoke `npm run start`.
+dependencies in `tools/scan-launcher` and run `npm run start` there directly.
 
 Current bootstrap behavior:
 

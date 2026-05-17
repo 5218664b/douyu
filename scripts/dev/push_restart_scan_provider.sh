@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
 PI_HOST="${PI_HOST:-pi@192.168.2.105}"
 PI_PASSWORD="${PI_PASSWORD:-x}"
@@ -40,7 +40,5 @@ sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "
     -v '${REMOTE_SCAN_DIR}/package.json:/app/package.json:ro' \
     -v '${REMOTE_SCAN_DIR}/package-lock.json:/app/package-lock.json:ro' \
     '${SCAN_IMAGE}' \
-    /app/start.js
+    /app/start.js >/dev/null
 "
-
-echo "rebuilt and restarted: ${CONTAINER_NAME}"

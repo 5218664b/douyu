@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
 PI_HOST="${PI_HOST:-pi@192.168.2.105}"
 PI_PASSWORD="${PI_PASSWORD:-x}"
@@ -10,15 +10,12 @@ REMOTE_RUNTIME_ENV="${REMOTE_DIR}/runtime/stream.env"
 REMOTE_QR_IMAGE="${REMOTE_DIR}/runtime/douyu-login-qr.png"
 SCAN_CONTAINER_NAME="${SCAN_CONTAINER_NAME:-douyu-scan-test}"
 
-echo "clearing previous scan artifacts on Raspberry Pi..."
 sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "
   rm -f '${REMOTE_RUNTIME_ENV}' '${REMOTE_QR_IMAGE}'
 "
 
-echo "starting scan provider on Raspberry Pi..."
-"${ROOT_DIR}/scripts/push_restart_scan_provider.sh"
+"${ROOT_DIR}/scripts/dev/push_restart_scan_provider.sh"
 
-echo "streaming scan-provider logs; scan the QR code in your terminal..."
 sshpass -p "${PI_PASSWORD}" ssh -tt -o StrictHostKeyChecking=no "${PI_HOST}" "
   docker logs -f '${SCAN_CONTAINER_NAME}'
 " &
@@ -29,7 +26,6 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-echo "waiting for scan-provider to finish..."
 EXIT_CODE="$(sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "
   docker wait '${SCAN_CONTAINER_NAME}'
 ")"
@@ -52,9 +48,9 @@ cleanup
 trap - EXIT INT TERM
 
 echo "stream credentials received; restarting relay..."
-"${ROOT_DIR}/scripts/push_restart_relay.sh"
+"${ROOT_DIR}/scripts/dev/push_restart_relay.sh"
 
 echo "restarting app..."
-SYNC_CONFIG=0 "${ROOT_DIR}/scripts/push_restart_app.sh"
+SYNC_CONFIG=0 "${ROOT_DIR}/scripts/dev/push_restart_app.sh"
 
 echo "scan completed and streaming restarted"
