@@ -14,12 +14,16 @@
 ./scripts/dev/menu.sh
 ```
 
-这个入口会用中文菜单提供最常用的四项功能：
+这个入口会用中文菜单提供完整的宿主机调试与发布功能：
 
 - 一键扫码并启动树莓派推流
 - 仅更新并重启树莓派 app
 - 仅更新并重启树莓派 relay
-- 发布 app/relay/scan 镜像到树莓派
+- 仅更新并重启树莓派 scan-provider
+- 发布 app 镜像到树莓派
+- 发布 relay 镜像到树莓派
+- 发布 scan-provider 镜像到树莓派
+- 发布 app/relay/scan 全部镜像到树莓派
 
 如果你已经熟悉各脚本，再直接使用 `scripts/dev/` 或 `scripts/pi/` 下的细分脚本即可。
 
