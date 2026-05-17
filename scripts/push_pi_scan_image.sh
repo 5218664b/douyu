@@ -29,4 +29,7 @@ ${SSH_CMD} "${PI_HOST}" "
   docker load -i '${SCAN_TAR_NAME}'
 "
 
+# shellcheck disable=SC2086
+${SSH_CMD} "${PI_HOST}" "docker image prune -f >/dev/null"
+
 echo "pushed scan image: ${SCAN_IMAGE}"

@@ -62,9 +62,6 @@ sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "
     mv '${REMOTE_CONFIG}.new' '${REMOTE_CONFIG}'
   fi
   docker cp '${REMOTE_BIN}' '${CONTAINER_NAME}:/app/douyu-streamer'
-  if [ '${SYNC_CONFIG}' = '1' ]; then
-    docker cp '${REMOTE_CONFIG}' '${CONTAINER_NAME}:/app/configs/app.yaml'
-  fi
   docker restart '${CONTAINER_NAME}' >/dev/null
 "
 

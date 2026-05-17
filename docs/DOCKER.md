@@ -24,6 +24,20 @@ docker buildx build --platform linux/arm64 -t douyu-relay:pi4b --load -f docker/
 docker save douyu-streamer:pi4b -o douyu-streamer-pi4b.tar
 ```
 
+Recommended Pi image push workflow:
+
+```bash
+PI_PASSWORD='x' ./scripts/push_pi_app_image.sh
+PI_PASSWORD='x' ./scripts/push_pi_relay_image.sh
+PI_PASSWORD='x' ./scripts/push_pi_scan_image.sh
+```
+
+For a full release-style refresh, use:
+
+```bash
+PI_PASSWORD='x' ./scripts/release_pi_images.sh
+```
+
 For relay, the preferred deployment flow is:
 
 ```bash

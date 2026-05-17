@@ -189,6 +189,7 @@ func buildConcatArgs(cfg config.StreamConfig, concatFile string) []string {
 
 	if cfg.CopyAudio {
 		args = append(args, "-c:a", "copy")
+		args = append(args, "-bsf:a", "aac_adtstoasc")
 	} else {
 		args = append(args, "-c:a", "aac", "-b:a", "128k")
 	}

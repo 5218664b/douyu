@@ -30,4 +30,7 @@ ${SSH_CMD} "${PI_HOST}" "
   docker load -i '${RELAY_TAR_NAME}'
 "
 
+# shellcheck disable=SC2086
+${SSH_CMD} "${PI_HOST}" "docker image prune -f >/dev/null"
+
 echo "pushed relay image: ${RELAY_IMAGE}"

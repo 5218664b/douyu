@@ -13,7 +13,7 @@ stream:
   ffmpeg_path: "/usr/bin/ffmpeg"
   ffmpeg_loglevel: "warning"
   copy_video: true
-  copy_audio: false
+  copy_audio: true
   loop_single_input: false
 
 danmaku:

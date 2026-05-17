@@ -6,8 +6,26 @@ const Jimp = require("jimp");
 const jsQR = require("jsqr");
 const qrcode = require("qrcode-terminal");
 
-const rootDir = path.resolve(__dirname, "..", "..");
-const runtimeDir = path.join(rootDir, "runtime");
+function resolveRuntimeDir() {
+  const candidates = [];
+
+  if (process.env.DOUYU_SCAN_RUNTIME_DIR) {
+    candidates.push(process.env.DOUYU_SCAN_RUNTIME_DIR);
+  }
+
+  candidates.push("/app/runtime");
+  candidates.push(path.join(path.resolve(__dirname, "..", ".."), "runtime"));
+
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return candidates[0];
+}
+
+const runtimeDir = resolveRuntimeDir();
 const outputPath = path.join(runtimeDir, "stream.env");
 const qrOutputPath = path.join(runtimeDir, "douyu-login-qr.png");
 const roomUrl = process.env.DOUYU_SCAN_ROOM_URL || "https://www.douyu.com/creator/main/live";
@@ -17,6 +35,22 @@ const headless = String(process.env.DOUYU_SCAN_HEADLESS || "true").toLowerCase()
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForURLContains(page, expected, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const currentURL = page.url();
+      if (currentURL && currentURL.includes(expected)) {
+        return;
+      }
+    } catch (error) {
+      // Ignore transient navigation/context errors while the page is changing.
+    }
+    await sleep(1000);
+  }
+  throw new Error(`timed out waiting for URL containing: ${expected}`);
 }
 
 async function decodeQrFromBuffer(buffer) {
@@ -67,8 +101,9 @@ async function run() {
   await fsp.mkdir(runtimeDir, { recursive: true });
 
   const launchOptions = {
-    headless,
+    headless: headless ? "new" : false,
     executablePath: fs.existsSync(browserPath) ? browserPath : undefined,
+    protocolTimeout: 600000,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -81,7 +116,6 @@ async function run() {
   const browser = await puppeteer.launch(launchOptions);
 
   try {
-    console.log("launch succeeded, opening https://passport.douyu.com/");
     const page = await browser.newPage();
 
     const context = browser.defaultBrowserContext();
@@ -115,14 +149,12 @@ async function run() {
 
     const qrText = await decodeQrFromBuffer(qrBuffer);
     if (qrText) {
-      console.log("scan this QR code:");
       qrcode.generate(qrText, { small: true });
     } else {
       console.log("qr decode failed, use the saved image instead");
     }
 
-    console.log(`waiting for QR scan (headless=${headless})`);
-    await page.waitForFunction('document.URL.includes("https://www.douyu.com/")', { timeout: 300000 });
+    await waitForURLContains(page, "https://www.douyu.com/", 300000);
 
     console.log("scan complete, opening creator live page");
     await page.goto(roomUrl, { waitUntil: "domcontentloaded", timeout: 0 });
@@ -157,7 +189,7 @@ async function run() {
         null,
         XPathResult.FIRST_ORDERED_NODE_TYPE,
         null
-      ).iterateNext();
+      ).singleNodeValue;
       const button = node && node.lastChild;
       if (button) {
         button.dispatchEvent(
@@ -180,7 +212,7 @@ async function run() {
         null,
         XPathResult.FIRST_ORDERED_NODE_TYPE,
         null
-      ).iterateNext();
+      ).singleNodeValue;
       const button = node && node.lastChild;
       if (button) {
         button.dispatchEvent(
@@ -208,7 +240,6 @@ async function run() {
   }
 }
 
-console.log("starting scan launcher");
 run().catch((error) => {
   console.error(error);
   process.exit(1);

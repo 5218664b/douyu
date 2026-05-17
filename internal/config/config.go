@@ -73,7 +73,7 @@ func parse(content []byte) (Config, error) {
 			FFmpegPath: "/usr/bin/ffmpeg",
 			FFmpegLogLevel: "warning",
 			CopyVideo:  true,
-			CopyAudio:  false,
+			CopyAudio:  true,
 			LoopSingleInput: false,
 		},
 		API: APIConfig{

@@ -1,14 +1,15 @@
-FROM golang:1.22-bookworm AS builder
+ARG DOUYU_STREAMER_BASE_IMAGE=douyu-streamer-base:pi4b
+FROM golang:1.23-bookworm AS builder
 
 WORKDIR /src
 
 COPY go.mod ./
+COPY go.sum ./
 COPY cmd ./cmd
 COPY internal ./internal
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /out/douyu-streamer ./cmd/streamer
 
-ARG DOUYU_STREAMER_BASE_IMAGE=douyu-streamer-base:pi4b
 FROM ${DOUYU_STREAMER_BASE_IMAGE}
 
 COPY --from=builder /out/douyu-streamer /app/douyu-streamer
