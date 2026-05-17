@@ -1,17 +1,10 @@
-FROM node:20-bookworm
+ARG DOUYU_SCAN_RUNTIME_IMAGE=douyu-scan-provider-node:hotfix
+FROM ${DOUYU_SCAN_RUNTIME_IMAGE}
 
 WORKDIR /app
-
-ENV PUPPETEER_SKIP_DOWNLOAD=true
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends chromium \
-  && rm -rf /var/lib/apt/lists/*
 
 COPY tools/scan-launcher/package.json /app/package.json
 COPY tools/scan-launcher/package-lock.json /app/package-lock.json
 COPY tools/scan-launcher/start.js /app/start.js
-
-RUN npm ci
 
 CMD ["npm", "run", "start"]

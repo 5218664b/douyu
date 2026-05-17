@@ -3,14 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "description": "Scan-to-start launcher for douyu-streamer",
-  "type": "module",
   "scripts": {
     "start": "node start.js"
   },
   "dependencies": {
     "jimp": "^0.22.12",
     "jsqr": "^1.4.0",
-    "playwright": "^1.54.0",
+    "puppeteer": "^21.6.1",
     "qrcode-terminal": "^0.12.0"
   }
 }

@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -43,6 +45,7 @@ type Manager struct {
 	state ProcessState
 	done  chan ExitEvent
 	stopRequested bool
+	concatFile    string
 }
 
 func New(cfg config.StreamConfig) *Manager {
@@ -50,6 +53,10 @@ func New(cfg config.StreamConfig) *Manager {
 }
 
 func (m *Manager) Start(ctx context.Context, item library.Item) error {
+	return m.StartPlaylist(ctx, []library.Item{item}, 0)
+}
+
+func (m *Manager) StartPlaylist(ctx context.Context, items []library.Item, startIndex int) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -57,16 +64,33 @@ func (m *Manager) Start(ctx context.Context, item library.Item) error {
 		return fmt.Errorf("stream process already running")
 	}
 
-	args := buildArgs(m.cfg, item.Path)
+	if len(items) == 0 {
+		return fmt.Errorf("playlist is empty")
+	}
+	if startIndex < 0 || startIndex >= len(items) {
+		return fmt.Errorf("playlist start index out of range")
+	}
+
+	orderedItems := append([]library.Item(nil), items[startIndex:]...)
+	orderedItems = append(orderedItems, items[:startIndex]...)
+
+	concatFile, err := writeConcatFile(orderedItems)
+	if err != nil {
+		return err
+	}
+
+	args := buildConcatArgs(m.cfg, concatFile)
 	cmd := exec.CommandContext(ctx, m.cfg.FFmpegPath, args...)
 	cmd.Stdout = log.Writer()
 	cmd.Stderr = log.Writer()
 	if err := cmd.Start(); err != nil {
+		_ = os.Remove(concatFile)
 		return err
 	}
 
 	target := buildTarget(m.cfg)
 	m.cmd = cmd
+	m.concatFile = concatFile
 	m.done = make(chan ExitEvent, 1)
 	m.stopRequested = false
 	m.state = ProcessState{
@@ -74,7 +98,7 @@ func (m *Manager) Start(ctx context.Context, item library.Item) error {
 		PID:     cmd.Process.Pid,
 		Command: strings.Join(append([]string{m.cfg.FFmpegPath}, args...), " "),
 		Target:  target,
-		Source:  item.Path,
+		Source:  orderedItems[0].Path,
 	}
 
 	go func(proc *exec.Cmd, done chan ExitEvent) {
@@ -98,6 +122,7 @@ func (m *Manager) Stop() error {
 	}
 
 	err := m.cmd.Process.Kill()
+	m.cleanupLocked()
 	m.cmd = nil
 	m.done = nil
 	m.stopRequested = true
@@ -124,6 +149,7 @@ func (m *Manager) Poll() ExitEvent {
 
 	select {
 	case event := <-m.done:
+		m.cleanupLocked()
 		m.cmd = nil
 		m.done = nil
 		m.state.Running = false
@@ -144,7 +170,7 @@ func (m *Manager) Poll() ExitEvent {
 	}
 }
 
-func buildArgs(cfg config.StreamConfig, source string) []string {
+func buildConcatArgs(cfg config.StreamConfig, concatFile string) []string {
 	args := []string{
 		"-hide_banner",
 		"-loglevel", cfg.FFmpegLogLevel,
@@ -153,7 +179,7 @@ func buildArgs(cfg config.StreamConfig, source string) []string {
 	if cfg.LoopSingleInput {
 		args = append(args, "-stream_loop", "-1")
 	}
-	args = append(args, "-i", source)
+	args = append(args, "-f", "concat", "-safe", "0", "-i", concatFile)
 
 	if cfg.CopyVideo {
 		args = append(args, "-c:v", "copy")
@@ -173,4 +199,44 @@ func buildArgs(cfg config.StreamConfig, source string) []string {
 
 func buildTarget(cfg config.StreamConfig) string {
 	return strings.TrimRight(cfg.RTMPURL, "/") + "/" + cfg.StreamKey
+}
+
+func writeConcatFile(items []library.Item) (string, error) {
+	file, err := os.CreateTemp("", "douyu-streamer-*.ffconcat")
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := io.WriteString(file, "ffconcat version 1.0\n"); err != nil {
+		file.Close()
+		_ = os.Remove(file.Name())
+		return "", err
+	}
+
+	for _, item := range items {
+		if _, err := fmt.Fprintf(file, "file '%s'\n", escapeConcatPath(item.Path)); err != nil {
+			file.Close()
+			_ = os.Remove(file.Name())
+			return "", err
+		}
+	}
+
+	if err := file.Close(); err != nil {
+		_ = os.Remove(file.Name())
+		return "", err
+	}
+
+	return file.Name(), nil
+}
+
+func escapeConcatPath(path string) string {
+	return strings.ReplaceAll(filepath.Clean(path), "'", "'\\''")
+}
+
+func (m *Manager) cleanupLocked() {
+	if m.concatFile == "" {
+		return
+	}
+	_ = os.Remove(m.concatFile)
+	m.concatFile = ""
 }

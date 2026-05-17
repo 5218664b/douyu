@@ -28,7 +28,7 @@ For relay, the preferred deployment flow is:
 
 ```bash
 PI_PASSWORD='x' ./scripts/push_pi_relay_image.sh
-PI_PASSWORD='x' ./scripts/sync_pi_relay_config.sh
+./scripts/push_restart_relay.sh
 ```
 
 If you want to reuse the preinstalled `ffmpeg` layer across frequent app builds,
@@ -51,16 +51,16 @@ The default compose file publishes the local API on `127.0.0.1:8080`.
 Optional scan flow:
 
 ```bash
-docker buildx build --platform linux/arm64 -t douyu-scan-provider-playwright:pi4b --load -f docker/Dockerfile.scan-launcher .
+docker buildx build --platform linux/arm64 -t douyu-scan-provider-node:pi4b --load -f docker/Dockerfile.scan-launcher .
 docker compose --profile scan run --rm scan-provider
 ```
 
-The scan provider writes `runtime/stream.env`. The normal app container stays
+The scan provider writes `runtime/stream.env`. The normal `app` and `relay` containers stay
 separate from this browser automation step.
 
-If you run the scan flow locally instead of in Docker, install the Node
-dependencies once under `tools/scan-launcher/` before invoking
-`scripts/scan_and_start.sh`.
+If you run the scan flow locally instead of in Docker, install the Node.js
+dependencies in `tools/scan-launcher` and let `scripts/scan_and_start.sh`
+invoke `npm run start`.
 
 Current bootstrap behavior:
 

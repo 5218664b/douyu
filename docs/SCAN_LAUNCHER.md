@@ -16,10 +16,11 @@ Provide a lightweight launcher plus an optional scan provider that:
 
 ```text
 tools/scan-launcher/
-  package.json
   start.js
 docker/
   Dockerfile.scan-launcher
+  Dockerfile.scan-launcher-dev
+  Dockerfile.scan-launcher-runtime
 runtime/
   stream.env
 scripts/
@@ -30,7 +31,7 @@ scripts/
 
 ## Current status
 
-An initial Playwright scan provider is in place.
+The active scan provider uses Node.js browser automation.
 
 Current behavior:
 
@@ -44,11 +45,13 @@ Current behavior:
 - writes them to `runtime/stream.env`
 - starts `bin/douyu-streamer` with exported runtime variables
 
-The default local wrapper no longer installs Node dependencies at runtime.
-It expects either:
+The default local wrapper prefers `npm run start` inside `tools/scan-launcher`
+when dependencies are installed locally.
+
+It otherwise expects either:
 
 - the scan-provider container to be used, or
-- `tools/scan-launcher/node_modules` to have been prepared in advance
+- Node.js dependencies to be installed locally
 
 ## Container-first requirements
 
@@ -60,8 +63,14 @@ Preferred runtime:
 The optional scan-provider container carries:
 
 - Node.js
-- Playwright
+- Puppeteer
 - Chromium runtime
+
+`Dockerfile.scan-launcher-dev` is the debug-friendly variant:
+
+- `FROM douyu-scan-provider-node:hotfix`
+- copy the latest launcher sources into the runtime image
+- reuse the preinstalled runtime dependencies from the base image
 
 Optional environment variables:
 
@@ -83,7 +92,7 @@ For direct Pi usage, the intended mode is:
 Build the scan-provider image:
 
 ```bash
-docker buildx build --platform linux/arm64 -t douyu-scan-provider-playwright:pi4b --load -f docker/Dockerfile.scan-launcher .
+docker buildx build --platform linux/arm64 -t douyu-scan-provider-node:pi4b --load -f docker/Dockerfile.scan-launcher .
 ```
 
 Run the optional scan profile:
@@ -104,9 +113,10 @@ If `runtime/stream.env` is not present yet, use:
 scripts/scan_and_start.sh
 ```
 
-For local Node-based use, prepare dependencies once:
+For local Node.js-based use:
 
 ```bash
 cd tools/scan-launcher
 npm install
+npm run start
 ```

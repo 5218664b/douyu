@@ -3,7 +3,8 @@ services:
     image: ${DOUYU_RELAY_IMAGE:-douyu-relay:pi4b}
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     ports:
       - "1935:1935"
     volumes:
@@ -16,7 +17,8 @@ services:
     depends_on:
       - relay
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DOUYU_STREAMER_CONFIG: ${DOUYU_STREAMER_CONFIG:-/app/configs/app.yaml}
     ports:
@@ -27,12 +29,13 @@ services:
       - ./runtime:/app/runtime
 
   scan-provider:
-    image: ${DOUYU_SCAN_PROVIDER_IMAGE:-douyu-scan-provider-playwright:pi4b}
+    image: ${DOUYU_SCAN_PROVIDER_IMAGE:-douyu-scan-provider-node:pi4b}
     profiles: ["scan"]
     stdin_open: true
     tty: true
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DOUYU_SCAN_HEADLESS: ${DOUYU_SCAN_HEADLESS:-true}
       DOUYU_SCAN_ROOM_URL: ${DOUYU_SCAN_ROOM_URL:-https://www.douyu.com/creator/main/live}

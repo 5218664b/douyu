@@ -63,7 +63,7 @@ func (r *Runtime) Start(ctx context.Context) error {
 	r.rootCtx = ctx
 
 	r.state.SetStatus("preparing")
-	if err := r.stream.Start(r.rootCtx, r.playlist.Current()); err != nil {
+	if err := r.stream.StartPlaylist(r.rootCtx, r.playlist.Items(), r.playlist.Current().Position); err != nil {
 		r.state.SetError(err.Error())
 		return err
 	}
@@ -239,14 +239,14 @@ func (r *Runtime) checkStream() {
 	}
 
 	if err.Reason == stream.ExitReasonCompleted {
-		log.Printf("runtime: stream completed source=%s", r.playlist.Current().Path)
-		r.playlist.Advance()
-		r.syncState("switching")
+	log.Printf("runtime: stream completed source=%s", r.playlist.Current().Path)
+	r.playlist.Advance()
+	r.syncState("switching")
 
-		restartErr := r.stream.Start(r.rootCtx, r.playlist.Current())
-		if restartErr != nil {
-			r.scheduleRecoveryLocked(restartErr.Error())
-			return
+	restartErr := r.stream.StartPlaylist(r.rootCtx, r.playlist.Items(), r.playlist.Current().Position)
+	if restartErr != nil {
+		r.scheduleRecoveryLocked(restartErr.Error())
+		return
 		}
 
 		r.state.ClearError()

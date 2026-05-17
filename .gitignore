@@ -5,3 +5,9 @@ bin
 data/videos/*
 !data/videos/.gitkeep
 *.local.md
+.scan-build-out/
+*.tar
+/scan-launcher
+/scan-launcher-smoke
+tools/scan-launcher/scan-launcher
+runtime/*.bak.codex
