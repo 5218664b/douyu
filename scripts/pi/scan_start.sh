@@ -5,9 +5,9 @@ ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 RUNTIME_DIR="${ROOT_DIR}/runtime"
 RUNTIME_ENV="${RUNTIME_DIR}/stream.env"
 QR_IMAGE="${RUNTIME_DIR}/douyu-login-qr.png"
-SCAN_CONTAINER_NAME="${SCAN_CONTAINER_NAME:-douyu-scan}"
-RELAY_CONTAINER_NAME="${RELAY_CONTAINER_NAME:-douyu-relay}"
-APP_CONTAINER_NAME="${APP_CONTAINER_NAME:-douyu-app}"
+SCAN_CONTAINER_NAME="douyu-scan"
+RELAY_CONTAINER_NAME="douyu-relay"
+APP_CONTAINER_NAME="douyu-app"
 
 rm -f "${RUNTIME_ENV}" "${QR_IMAGE}"
 
@@ -20,7 +20,7 @@ docker run -d \
   -v "${ROOT_DIR}/tools/scan-launcher/start.js:/app/start.js:ro" \
   -v "${ROOT_DIR}/tools/scan-launcher/package.json:/app/package.json:ro" \
   -v "${ROOT_DIR}/tools/scan-launcher/package-lock.json:/app/package-lock.json:ro" \
-  "${DOUYU_SCAN_PROVIDER_IMAGE:-douyu-scan-provider-node:pi4b}" \
+  "douyu-scan-provider-node:pi4b" \
   /app/start.js >/dev/null
 
 docker logs -f "${SCAN_CONTAINER_NAME}" &

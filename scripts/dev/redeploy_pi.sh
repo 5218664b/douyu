@@ -1,21 +1,20 @@
 #!/usr/bin/env sh
 set -eu
 
-ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-
-PI_HOST="${PI_HOST:-pi@192.168.2.105}"
-PI_PASSWORD="${PI_PASSWORD:-x}"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/common.sh"
 REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu-rebuild}"
 VIDEO_SOURCE_HOST_DIR="${VIDEO_SOURCE_HOST_DIR:-/home/pi/samba/hard02/magic/电视剧/士兵突击(Soldiers Sortie)624x336.X264.AAC.350M.30集全[DVDRip]/output}"
 
-sshpass -p "${PI_PASSWORD}" scp -o StrictHostKeyChecking=no \
+sshpass -p "${PI_PASSWORD}" scp ${PI_SCP_OPTS} \
   "${ROOT_DIR}/docker-compose.yml" \
   "${ROOT_DIR}/.env.example" \
   "${ROOT_DIR}/configs/app.yaml" \
   "${ROOT_DIR}/configs/nginx-rtmp.conf" \
   "${PI_HOST}:${REMOTE_DIR}/"
 
-sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "
+sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
   set -eu
   mkdir -p '${REMOTE_DIR}/configs'
   cp '${REMOTE_DIR}/app.yaml' '${REMOTE_DIR}/configs/app.yaml'

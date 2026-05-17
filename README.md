@@ -29,6 +29,98 @@
 
 如果你已经熟悉各脚本，再直接使用 `scripts/dev/` 或 `scripts/pi/` 下的细分脚本即可。
 
+新树莓派本地初始化后，推荐直接执行：
+
+```bash
+./scripts/pi/bootstrap_and_scan.sh
+```
+
+这条命令会：
+
+- 如果 `.env` 不存在，就从 `.env.example` 生成
+- 重建 `app / relay / scan-provider`
+- 在当前终端打印二维码
+- 扫码成功后自动开始推流
+
+## 新树莓派初始化
+
+建议在新的树莓派上按下面顺序准备环境：
+
+1. 安装 Docker Engine 和 Docker Compose Plugin
+
+参考 Docker 官方 Debian 安装文档执行。对于 Raspberry Pi OS 64-bit / Debian 系系统，通常流程是：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+  $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker $USER
+```
+
+完成后重新登录一次 shell，确认：
+
+```bash
+docker version
+docker compose version
+```
+
+2. clone 仓库并准备配置
+
+```bash
+git clone <你的仓库地址>
+cd douyu
+cp .env.example .env
+```
+
+3. 按需修改 `.env`
+
+至少建议检查这些项：
+
+- `PI_HOST`
+- `PI_PASSWORD`
+- `PI_SSH_PORT`
+- `DOUYU_VIDEO_SOURCE_HOST_DIR`
+  这是树莓派宿主机上实际视频目录，当前默认值是：
+  `/home/pi/samba/hard02/magic/电视剧/士兵突击(Soldiers Sortie)624x336.X264.AAC.350M.30集全[DVDRip]/output`
+- `DOUYU_STREAMER_ROOM_URL`
+  改成你自己的直播间地址
+- `DOUYU_SCAN_HEADLESS`
+  默认 `true`，一般保持即可
+
+通常不需要改的：
+
+- 镜像名和容器名已经固定在仓库中，不需要在 `.env` 里配置
+
+4. 确保镜像已经在树莓派本机
+
+如果你是从宿主机开发机推送镜像，先在宿主机执行：
+
+```bash
+./scripts/dev/menu.sh
+```
+
+选择发布相关菜单项，或者直接执行：
+
+```bash
+./scripts/dev/release_pi_images.sh
+```
+
+5. 在树莓派本机一键部署并扫码启动
+
+```bash
+./scripts/pi/bootstrap_and_scan.sh
+```
+
 ## 设计目标
 
 新系统围绕以下原则设计：

@@ -1,22 +1,21 @@
 #!/usr/bin/env sh
 set -eu
 
-ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-
-PI_HOST="${PI_HOST:-pi@192.168.2.105}"
-PI_PASSWORD="${PI_PASSWORD:-x}"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/common.sh"
 REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu-rebuild}"
 REMOTE_RUNTIME_ENV="${REMOTE_DIR}/runtime/stream.env"
 REMOTE_QR_IMAGE="${REMOTE_DIR}/runtime/douyu-login-qr.png"
-SCAN_CONTAINER_NAME="${SCAN_CONTAINER_NAME:-douyu-scan}"
+SCAN_CONTAINER_NAME="douyu-scan"
 
-sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "
+sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
   rm -f '${REMOTE_RUNTIME_ENV}' '${REMOTE_QR_IMAGE}'
 "
 
 "${ROOT_DIR}/scripts/dev/push_restart_scan_provider.sh"
 
-sshpass -p "${PI_PASSWORD}" ssh -tt -o StrictHostKeyChecking=no "${PI_HOST}" "
+sshpass -p "${PI_PASSWORD}" ssh -tt ${PI_SSH_OPTS} "${PI_HOST}" "
   docker logs -f '${SCAN_CONTAINER_NAME}'
 " &
 LOGS_PID=$!
@@ -26,7 +25,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-EXIT_CODE="$(sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "
+EXIT_CODE="$(sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
   docker wait '${SCAN_CONTAINER_NAME}'
 ")"
 
@@ -35,7 +34,7 @@ if [ "${EXIT_CODE}" != "0" ]; then
   exit 1
 fi
 
-if ! sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "
+if ! sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
   test -f '${REMOTE_RUNTIME_ENV}' &&
   grep -q '^DOUYU_STREAMER_STREAM_RTMP_URL=' '${REMOTE_RUNTIME_ENV}' &&
   grep -q '^DOUYU_STREAMER_STREAM_KEY=' '${REMOTE_RUNTIME_ENV}'

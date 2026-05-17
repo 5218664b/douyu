@@ -1,14 +1,13 @@
 #!/usr/bin/env sh
 set -eu
 
-ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-
-PI_HOST="pi@192.168.2.105"
-PI_PASSWORD="x"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/common.sh"
 REMOTE_DIR="/home/pi/douyu-rebuild"
 REMOTE_BIN="${REMOTE_DIR}/douyu-streamer"
 REMOTE_CONFIG="${REMOTE_DIR}/configs/app.yaml"
-CONTAINER_NAME="${APP_CONTAINER_NAME:-douyu-app}"
+CONTAINER_NAME="douyu-app"
 SYNC_CONFIG="${SYNC_CONFIG:-1}"
 BUILDER_CONTAINER_NAME="douyu-app-builder"
 BUILDER_IMAGE="${APP_BUILDER_IMAGE:-golang:1.23-bookworm}"
@@ -43,17 +42,17 @@ docker exec \
   "${BUILDER_CONTAINER_NAME}" \
   sh -lc 'CGO_ENABLED=0 GOOS=linux GOARCH=arm64 /usr/local/go/bin/go build -buildvcs=false -o /src/bin/douyu-streamer ./cmd/streamer'
 
-sshpass -p "${PI_PASSWORD}" scp -o StrictHostKeyChecking=no \
+sshpass -p "${PI_PASSWORD}" scp ${PI_SCP_OPTS} \
   "${ROOT_DIR}/bin/douyu-streamer" \
   "${PI_HOST}:${REMOTE_BIN}.new"
 
 if [ "${SYNC_CONFIG}" = "1" ]; then
-  sshpass -p "${PI_PASSWORD}" scp -o StrictHostKeyChecking=no \
+  sshpass -p "${PI_PASSWORD}" scp ${PI_SCP_OPTS} \
     "${ROOT_DIR}/configs/app.yaml" \
     "${PI_HOST}:${REMOTE_CONFIG}.new"
 fi
 
-sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "
+sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
   set -eu
   mkdir -p '${REMOTE_DIR}/configs'
   mv '${REMOTE_BIN}.new' '${REMOTE_BIN}'

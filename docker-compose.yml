@@ -1,7 +1,7 @@
 services:
   relay:
-    container_name: ${DOUYU_RELAY_CONTAINER_NAME:-douyu-relay}
-    image: ${DOUYU_RELAY_IMAGE:-douyu-relay:pi4b}
+    container_name: douyu-relay
+    image: douyu-relay:pi4b
     restart: unless-stopped
     env_file:
       - path: .env
@@ -13,8 +13,8 @@ services:
       - ./runtime:/app/runtime:ro
 
   app:
-    container_name: ${DOUYU_APP_CONTAINER_NAME:-douyu-app}
-    image: ${DOUYU_STREAMER_IMAGE:-douyu-app:pi4b}
+    container_name: douyu-app
+    image: douyu-app:pi4b
     restart: unless-stopped
     depends_on:
       - relay
@@ -31,8 +31,8 @@ services:
       - ./runtime:/app/runtime
 
   scan-provider:
-    container_name: ${DOUYU_SCAN_CONTAINER_NAME:-douyu-scan}
-    image: ${DOUYU_SCAN_PROVIDER_IMAGE:-douyu-scan-provider-node:pi4b}
+    container_name: douyu-scan
+    image: douyu-scan-provider-node:pi4b
     profiles: ["scan"]
     stdin_open: true
     tty: true

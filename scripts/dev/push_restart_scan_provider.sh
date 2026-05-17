@@ -1,28 +1,27 @@
 #!/usr/bin/env sh
 set -eu
 
-ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-
-PI_HOST="${PI_HOST:-pi@192.168.2.105}"
-PI_PASSWORD="${PI_PASSWORD:-x}"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/common.sh"
 REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu-rebuild}"
 REMOTE_RUNTIME_DIR="${REMOTE_DIR}/runtime"
 REMOTE_SCAN_DIR="${REMOTE_DIR}/scan-launcher-src"
-CONTAINER_NAME="${CONTAINER_NAME:-douyu-scan}"
-SCAN_IMAGE="${SCAN_IMAGE:-douyu-scan-provider-node:pi4b}"
+CONTAINER_NAME="douyu-scan"
+SCAN_IMAGE="douyu-scan-provider-node:pi4b"
 
-sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "
+sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
   set -eu
   mkdir -p '${REMOTE_RUNTIME_DIR}' '${REMOTE_SCAN_DIR}.tmp'
 "
 
-sshpass -p "${PI_PASSWORD}" scp -o StrictHostKeyChecking=no \
+sshpass -p "${PI_PASSWORD}" scp ${PI_SCP_OPTS} \
   "${ROOT_DIR}/tools/scan-launcher/start.js" \
   "${ROOT_DIR}/tools/scan-launcher/package.json" \
   "${ROOT_DIR}/tools/scan-launcher/package-lock.json" \
   "${PI_HOST}:${REMOTE_SCAN_DIR}.tmp/"
 
-sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "
+sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
   set -eu
   mkdir -p '${REMOTE_SCAN_DIR}'
   cp '${REMOTE_SCAN_DIR}.tmp/start.js' '${REMOTE_SCAN_DIR}/start.js'

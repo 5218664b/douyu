@@ -1,21 +1,21 @@
 #!/usr/bin/env sh
 set -eu
 
-ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-PI_HOST="${PI_HOST:-pi@192.168.2.105}"
-PI_PASSWORD="${PI_PASSWORD:-}"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck disable=SC1091
+. "${SCRIPT_DIR}/common.sh"
 REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu-rebuild}"
-SCAN_IMAGE="${SCAN_IMAGE:-douyu-scan-provider-node:pi4b}"
-SCAN_TAR_NAME="${SCAN_TAR_NAME:-douyu-scan-provider-node.tar}"
+SCAN_IMAGE="douyu-scan-provider-node:pi4b"
+SCAN_TAR_NAME="douyu-scan-provider-node.tar"
 SCAN_TAR_PATH="${ROOT_DIR}/${SCAN_TAR_NAME}"
 
 if [ -n "${PI_PASSWORD}" ]; then
   SSH_PREFIX="sshpass -p ${PI_PASSWORD}"
-  SCP_CMD="${SSH_PREFIX} scp -o StrictHostKeyChecking=no"
-  SSH_CMD="${SSH_PREFIX} ssh -o StrictHostKeyChecking=no"
+  SCP_CMD="${SSH_PREFIX} scp ${PI_SCP_OPTS}"
+  SSH_CMD="${SSH_PREFIX} ssh ${PI_SSH_OPTS}"
 else
-  SCP_CMD="scp"
-  SSH_CMD="ssh"
+  SCP_CMD="scp ${PI_SCP_OPTS}"
+  SSH_CMD="ssh ${PI_SSH_OPTS}"
 fi
 
 docker save "${SCAN_IMAGE}" -o "${SCAN_TAR_PATH}"
