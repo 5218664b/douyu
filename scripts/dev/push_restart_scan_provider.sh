@@ -8,7 +8,7 @@ PI_PASSWORD="${PI_PASSWORD:-x}"
 REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu-rebuild}"
 REMOTE_RUNTIME_DIR="${REMOTE_DIR}/runtime"
 REMOTE_SCAN_DIR="${REMOTE_DIR}/scan-launcher-src"
-CONTAINER_NAME="${CONTAINER_NAME:-douyu-scan-test}"
+CONTAINER_NAME="${CONTAINER_NAME:-douyu-scan}"
 SCAN_IMAGE="${SCAN_IMAGE:-douyu-scan-provider-node:pi4b}"
 
 sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "

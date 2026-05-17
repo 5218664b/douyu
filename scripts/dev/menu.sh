@@ -12,7 +12,9 @@ echo "5. 发布 app 镜像到树莓派"
 echo "6. 发布 relay 镜像到树莓派"
 echo "7. 发布 scan-provider 镜像到树莓派"
 echo "8. 发布 app/relay/scan 全部镜像到树莓派"
-printf "请输入编号 [1-8]: "
+echo "9. 远程一键重新部署树莓派 app + relay"
+echo "10. 仅用 compose 重建树莓派 scan-provider"
+printf "请输入编号 [1-10]: "
 read -r choice
 
 case "${choice}" in
@@ -39,6 +41,12 @@ case "${choice}" in
     ;;
   8)
     exec "${ROOT_DIR}/scripts/dev/release_pi_images.sh"
+    ;;
+  9)
+    exec "${ROOT_DIR}/scripts/dev/redeploy_pi.sh"
+    ;;
+  10)
+    exec "${ROOT_DIR}/scripts/dev/push_restart_scan_provider.sh"
     ;;
   *)
     echo "无效输入: ${choice}" >&2

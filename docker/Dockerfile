@@ -1,4 +1,4 @@
-ARG DOUYU_STREAMER_BASE_IMAGE=douyu-streamer-base:pi4b
+ARG DOUYU_STREAMER_BASE_IMAGE=douyu-app-base:pi4b
 FROM golang:1.23-bookworm AS builder
 
 WORKDIR /src

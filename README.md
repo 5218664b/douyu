@@ -24,6 +24,8 @@
 - 发布 relay 镜像到树莓派
 - 发布 scan-provider 镜像到树莓派
 - 发布 app/relay/scan 全部镜像到树莓派
+- 远程一键重新部署树莓派 app + relay
+- 仅用 compose 重建树莓派 scan-provider
 
 如果你已经熟悉各脚本，再直接使用 `scripts/dev/` 或 `scripts/pi/` 下的细分脚本即可。
 

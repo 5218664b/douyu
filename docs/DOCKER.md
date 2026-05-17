@@ -11,17 +11,17 @@ Recommended workflow for Raspberry Pi:
 
 ```bash
 cp .env.example .env
-docker load -i douyu-streamer-pi4b.tar
+docker load -i douyu-app-pi4b.tar
 docker compose up -d
 ```
 
 Recommended image build workflow on a stronger local machine:
 
 ```bash
-docker buildx build --platform linux/arm64 -t douyu-streamer-base:pi4b --load -f docker/Dockerfile.base .
-docker buildx build --platform linux/arm64 -t douyu-streamer:pi4b --load -f docker/Dockerfile .
+docker buildx build --platform linux/arm64 -t douyu-app-base:pi4b --load -f docker/Dockerfile.base .
+docker buildx build --platform linux/arm64 -t douyu-app:pi4b --load -f docker/Dockerfile .
 docker buildx build --platform linux/arm64 -t douyu-relay:pi4b --load -f docker/Dockerfile.relay .
-docker save douyu-streamer:pi4b -o douyu-streamer-pi4b.tar
+docker save douyu-app:pi4b -o douyu-app-pi4b.tar
 ```
 
 Recommended Pi image push workflow:
@@ -55,7 +55,7 @@ If you want to reuse the preinstalled `ffmpeg` layer across frequent app builds,
 build and export the base image too:
 
 ```bash
-docker save douyu-streamer-base:pi4b -o douyu-streamer-base-pi4b.tar
+docker save douyu-app-base:pi4b -o douyu-app-base-pi4b.tar
 ```
 
 Runtime inputs:

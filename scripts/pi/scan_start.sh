@@ -5,9 +5,9 @@ ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 RUNTIME_DIR="${ROOT_DIR}/runtime"
 RUNTIME_ENV="${RUNTIME_DIR}/stream.env"
 QR_IMAGE="${RUNTIME_DIR}/douyu-login-qr.png"
-SCAN_CONTAINER_NAME="${SCAN_CONTAINER_NAME:-douyu-scan-test}"
-RELAY_CONTAINER_NAME="${RELAY_CONTAINER_NAME:-douyu-rebuild-relay-1}"
-APP_CONTAINER_NAME="${APP_CONTAINER_NAME:-douyu-rebuild-app-1}"
+SCAN_CONTAINER_NAME="${SCAN_CONTAINER_NAME:-douyu-scan}"
+RELAY_CONTAINER_NAME="${RELAY_CONTAINER_NAME:-douyu-relay}"
+APP_CONTAINER_NAME="${APP_CONTAINER_NAME:-douyu-app}"
 
 rm -f "${RUNTIME_ENV}" "${QR_IMAGE}"
 

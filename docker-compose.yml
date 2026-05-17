@@ -1,5 +1,6 @@
 services:
   relay:
+    container_name: ${DOUYU_RELAY_CONTAINER_NAME:-douyu-relay}
     image: ${DOUYU_RELAY_IMAGE:-douyu-relay:pi4b}
     restart: unless-stopped
     env_file:
@@ -12,7 +13,8 @@ services:
       - ./runtime:/app/runtime:ro
 
   app:
-    image: ${DOUYU_STREAMER_IMAGE:-douyu-streamer:pi4b}
+    container_name: ${DOUYU_APP_CONTAINER_NAME:-douyu-app}
+    image: ${DOUYU_STREAMER_IMAGE:-douyu-app:pi4b}
     restart: unless-stopped
     depends_on:
       - relay
@@ -25,10 +27,11 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./configs/app.yaml:/app/configs/app.yaml:ro
-      - ./data/videos:/data/videos:ro
+      - ${DOUYU_VIDEO_SOURCE_HOST_DIR:-./data/videos}:/data/videos:ro
       - ./runtime:/app/runtime
 
   scan-provider:
+    container_name: ${DOUYU_SCAN_CONTAINER_NAME:-douyu-scan}
     image: ${DOUYU_SCAN_PROVIDER_IMAGE:-douyu-scan-provider-node:pi4b}
     profiles: ["scan"]
     stdin_open: true

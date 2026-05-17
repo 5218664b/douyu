@@ -6,13 +6,13 @@ ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 PI_HOST="pi@192.168.2.105"
 PI_PASSWORD="x"
 REMOTE_DIR="/home/pi/douyu-rebuild"
-REMOTE_CONFIG="${REMOTE_DIR}/configs/srs.conf"
+REMOTE_CONFIG="${REMOTE_DIR}/configs/nginx-rtmp.conf"
 REMOTE_RUNTIME_ENV="${REMOTE_DIR}/runtime/stream.env"
 SYNC_RUNTIME_ENV="${SYNC_RUNTIME_ENV:-1}"
-CONTAINER_NAME="${RELAY_CONTAINER_NAME:-douyu-rebuild-relay-1}"
+CONTAINER_NAME="${RELAY_CONTAINER_NAME:-douyu-relay}"
 
 sshpass -p "${PI_PASSWORD}" scp -o StrictHostKeyChecking=no \
-  "${ROOT_DIR}/configs/srs.conf" \
+  "${ROOT_DIR}/configs/nginx-rtmp.conf" \
   "${PI_HOST}:${REMOTE_CONFIG}.new"
 
 if [ "${SYNC_RUNTIME_ENV}" = "1" ] && [ -f "${ROOT_DIR}/runtime/stream.env" ]; then

@@ -1,4 +1,8 @@
-FROM tiangolo/nginx-rtmp:latest
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends nginx libnginx-mod-rtmp ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY docker/relay-entrypoint.sh /usr/local/bin/relay-entrypoint.sh
 

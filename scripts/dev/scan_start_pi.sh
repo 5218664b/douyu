@@ -8,7 +8,7 @@ PI_PASSWORD="${PI_PASSWORD:-x}"
 REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu-rebuild}"
 REMOTE_RUNTIME_ENV="${REMOTE_DIR}/runtime/stream.env"
 REMOTE_QR_IMAGE="${REMOTE_DIR}/runtime/douyu-login-qr.png"
-SCAN_CONTAINER_NAME="${SCAN_CONTAINER_NAME:-douyu-scan-test}"
+SCAN_CONTAINER_NAME="${SCAN_CONTAINER_NAME:-douyu-scan}"
 
 sshpass -p "${PI_PASSWORD}" ssh -o StrictHostKeyChecking=no "${PI_HOST}" "
   rm -f '${REMOTE_RUNTIME_ENV}' '${REMOTE_QR_IMAGE}'
