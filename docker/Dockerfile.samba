@@ -1,0 +1,11 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends samba \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY docker/samba-entrypoint.sh /usr/local/bin/samba-entrypoint.sh
+
+RUN chmod +x /usr/local/bin/samba-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/samba-entrypoint.sh"]

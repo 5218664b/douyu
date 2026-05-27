@@ -11,7 +11,7 @@ APP_BASE_TAR_NAME="douyu-app-base-pi4b.tar"
 APP_TAR_NAME="douyu-app-pi4b.tar"
 APP_BASE_TAR_PATH="${ROOT_DIR}/${APP_BASE_TAR_NAME}"
 APP_TAR_PATH="${ROOT_DIR}/${APP_TAR_NAME}"
-PUSH_BASE_IMAGE="${PUSH_BASE_IMAGE:-1}"
+PUSH_BASE_IMAGE="${PUSH_BASE_IMAGE:-0}"
 
 if [ -n "${PI_PASSWORD}" ]; then
   SSH_PREFIX="sshpass -p ${PI_PASSWORD}"

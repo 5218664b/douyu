@@ -6,6 +6,8 @@ video:
   formats:
     - .ts
     - .mp4
+  urls:
+    - "https://example.com/test.ts"
 
 stream:
   rtmp_url: "rtmp://relay:1935/live"
@@ -19,6 +21,17 @@ stream:
 danmaku:
   enabled: true
   command_prefix: "#"
+
+notify:
+  enabled: false
+  smtp_host: "smtp.example.com"
+  smtp_port: "587"
+  username: "alert@example.com"
+  password: "replace-me"
+  from: "alert@example.com"
+  to: "your-email@example.com"
+  subject_prefix: "[douyu-streamer]"
+  cooldown_seconds: 1800
 
 api:
   listen_addr: "0.0.0.0:8080"

@@ -13,6 +13,7 @@ type Config struct {
 	Video   VideoConfig
 	Stream  StreamConfig
 	Danmaku DanmakuConfig
+	Notify  NotifyConfig
 	API     APIConfig
 }
 
@@ -23,6 +24,7 @@ type RoomConfig struct {
 type VideoConfig struct {
 	SourceDir string
 	Formats   []string
+	URLs      []string
 }
 
 type StreamConfig struct {
@@ -38,6 +40,18 @@ type StreamConfig struct {
 type DanmakuConfig struct {
 	Enabled       bool
 	CommandPrefix string
+}
+
+type NotifyConfig struct {
+	Enabled         bool
+	SMTPHost        string
+	SMTPPort        string
+	Username        string
+	Password        string
+	From            string
+	To              []string
+	SubjectPrefix   string
+	CooldownSeconds int
 }
 
 type APIConfig struct {
@@ -83,10 +97,14 @@ func parse(content []byte) (Config, error) {
 			Enabled:       true,
 			CommandPrefix: "#",
 		},
+		Notify: NotifyConfig{
+			SubjectPrefix:   "[douyu-streamer]",
+			CooldownSeconds: 1800,
+		},
 	}
 
 	section := ""
-	inVideoFormats := false
+	videoListKey := ""
 	lines := strings.Split(string(content), "\n")
 	for idx, raw := range lines {
 		line := strings.TrimSpace(raw)
@@ -94,23 +112,33 @@ func parse(content []byte) (Config, error) {
 			continue
 		}
 
-		if section == "video" && line == "formats:" {
-			cfg.Video.Formats = nil
-			inVideoFormats = true
-			continue
-		}
-
 		if strings.HasSuffix(line, ":") && !strings.HasPrefix(line, "- ") {
-			section = strings.TrimSuffix(line, ":")
-			inVideoFormats = false
+			key := strings.TrimSuffix(line, ":")
+			if section == "video" && (key == "formats" || key == "urls") {
+				videoListKey = key
+				if key == "formats" {
+					cfg.Video.Formats = nil
+				} else {
+					cfg.Video.URLs = nil
+				}
+				continue
+			}
+			section = key
+			videoListKey = ""
 			continue
 		}
 
 		if strings.HasPrefix(line, "- ") {
-			if !inVideoFormats {
+			if section != "video" || videoListKey == "" {
 				return Config{}, fmt.Errorf("line %d: unexpected list item", idx+1)
 			}
-			cfg.Video.Formats = append(cfg.Video.Formats, strings.TrimSpace(strings.TrimPrefix(line, "- ")))
+			value := strings.TrimSpace(strings.Trim(strings.TrimPrefix(line, "- "), "\""))
+			switch videoListKey {
+			case "formats":
+				cfg.Video.Formats = append(cfg.Video.Formats, value)
+			case "urls":
+				cfg.Video.URLs = append(cfg.Video.URLs, value)
+			}
 			continue
 		}
 
@@ -157,6 +185,27 @@ func parse(content []byte) (Config, error) {
 			case "command_prefix":
 				cfg.Danmaku.CommandPrefix = value
 			}
+		case "notify":
+			switch key {
+			case "enabled":
+				cfg.Notify.Enabled = parseBool(value)
+			case "smtp_host":
+				cfg.Notify.SMTPHost = value
+			case "smtp_port":
+				cfg.Notify.SMTPPort = value
+			case "username":
+				cfg.Notify.Username = value
+			case "password":
+				cfg.Notify.Password = value
+			case "from":
+				cfg.Notify.From = value
+			case "to":
+				cfg.Notify.To = splitList(value)
+			case "subject_prefix":
+				cfg.Notify.SubjectPrefix = value
+			case "cooldown_seconds":
+				cfg.Notify.CooldownSeconds = parseInt(value)
+			}
 		case "api":
 			if key == "listen_addr" {
 				cfg.API.ListenAddr = value
@@ -169,6 +218,7 @@ func parse(content []byte) (Config, error) {
 	if len(cfg.Video.Formats) == 0 {
 		cfg.Video.Formats = []string{".ts", ".mp4"}
 	}
+	cfg.Video.URLs = compactStrings(cfg.Video.URLs)
 
 	return cfg, nil
 }
@@ -176,11 +226,20 @@ func parse(content []byte) (Config, error) {
 func applyEnv(cfg *Config) {
 	overrideString(&cfg.Room.URL, "DOUYU_STREAMER_ROOM_URL")
 	overrideString(&cfg.Video.SourceDir, "DOUYU_STREAMER_VIDEO_SOURCE_DIR")
+	if value, ok := os.LookupEnv("DOUYU_STREAMER_VIDEO_URLS"); ok {
+		cfg.Video.URLs = splitList(value)
+	}
 	overrideString(&cfg.Stream.RTMPURL, "DOUYU_STREAMER_STREAM_RTMP_URL")
 	overrideString(&cfg.Stream.StreamKey, "DOUYU_STREAMER_STREAM_KEY")
 	overrideString(&cfg.Stream.FFmpegPath, "DOUYU_STREAMER_FFMPEG_PATH")
 	overrideString(&cfg.Stream.FFmpegLogLevel, "DOUYU_STREAMER_FFMPEG_LOGLEVEL")
 	overrideString(&cfg.API.ListenAddr, "DOUYU_STREAMER_API_LISTEN_ADDR")
+	overrideString(&cfg.Notify.SMTPHost, "DOUYU_STREAMER_NOTIFY_SMTP_HOST")
+	overrideString(&cfg.Notify.SMTPPort, "DOUYU_STREAMER_NOTIFY_SMTP_PORT")
+	overrideString(&cfg.Notify.Username, "DOUYU_STREAMER_NOTIFY_USERNAME")
+	overrideString(&cfg.Notify.Password, "DOUYU_STREAMER_NOTIFY_PASSWORD")
+	overrideString(&cfg.Notify.From, "DOUYU_STREAMER_NOTIFY_FROM")
+	overrideString(&cfg.Notify.SubjectPrefix, "DOUYU_STREAMER_NOTIFY_SUBJECT_PREFIX")
 
 	if value, ok := os.LookupEnv("DOUYU_STREAMER_DANMAKU_ENABLED"); ok {
 		cfg.Danmaku.Enabled = parseBool(value)
@@ -195,14 +254,24 @@ func applyEnv(cfg *Config) {
 	if value, ok := os.LookupEnv("DOUYU_STREAMER_STREAM_LOOP_SINGLE_INPUT"); ok {
 		cfg.Stream.LoopSingleInput = parseBool(value)
 	}
+	if value, ok := os.LookupEnv("DOUYU_STREAMER_NOTIFY_ENABLED"); ok {
+		cfg.Notify.Enabled = parseBool(value)
+	}
+	if value, ok := os.LookupEnv("DOUYU_STREAMER_NOTIFY_TO"); ok {
+		cfg.Notify.To = splitList(value)
+	}
+	if value, ok := os.LookupEnv("DOUYU_STREAMER_NOTIFY_COOLDOWN_SECONDS"); ok {
+		cfg.Notify.CooldownSeconds = parseInt(value)
+	}
+	cfg.Notify.To = compactStrings(cfg.Notify.To)
 }
 
 func validate(cfg Config) error {
 	switch {
 	case cfg.Room.URL == "":
 		return errors.New("room.url is required")
-	case cfg.Video.SourceDir == "":
-		return errors.New("video.source_dir is required")
+	case strings.TrimSpace(cfg.Video.SourceDir) == "" && len(cfg.Video.URLs) == 0:
+		return errors.New("video.source_dir or video.urls is required")
 	case cfg.Stream.RTMPURL == "":
 		return errors.New("stream.rtmp_url is required")
 	case cfg.Stream.StreamKey == "":
@@ -211,6 +280,14 @@ func validate(cfg Config) error {
 		return errors.New("stream.ffmpeg_path is required")
 	case cfg.Stream.FFmpegLogLevel == "":
 		return errors.New("stream.ffmpeg_loglevel is required")
+	case cfg.Notify.Enabled && cfg.Notify.SMTPHost == "":
+		return errors.New("notify.smtp_host is required when notify.enabled=true")
+	case cfg.Notify.Enabled && cfg.Notify.SMTPPort == "":
+		return errors.New("notify.smtp_port is required when notify.enabled=true")
+	case cfg.Notify.Enabled && cfg.Notify.From == "":
+		return errors.New("notify.from is required when notify.enabled=true")
+	case cfg.Notify.Enabled && len(cfg.Notify.To) == 0:
+		return errors.New("notify.to is required when notify.enabled=true")
 	}
 
 	return nil
@@ -228,4 +305,31 @@ func parseBool(value string) bool {
 		return false
 	}
 	return parsed
+}
+
+func parseInt(value string) int {
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return 0
+	}
+	return parsed
+}
+
+func splitList(value string) []string {
+	fields := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == '\n'
+	})
+	return compactStrings(fields)
+}
+
+func compactStrings(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(strings.Trim(value, "\""))
+		if trimmed == "" {
+			continue
+		}
+		result = append(result, trimmed)
+	}
+	return result
 }

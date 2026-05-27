@@ -63,8 +63,10 @@ Runtime inputs:
 - `configs/app.yaml` for static configuration
 - `configs/nginx-rtmp.conf` for relay configuration template
 - `.env` for sensitive or host-specific overrides
-- `./data/videos` mounted into the container as the media source directory
+- `./data/videos` mounted into the container as the optional media source directory
 - `./runtime/stream.env` for runtime stream credentials and relay forward target when not using static `.env` values
+- `DOUYU_STREAMER_VIDEO_URLS` or `video.urls` for optional remote media inputs
+- `DOUYU_STREAMER_NOTIFY_*` or `notify.*` for optional SMTP email alerts on streaming failures
 
 The default compose file publishes the local API on `127.0.0.1:8080`.
 
@@ -83,8 +85,9 @@ dependencies in `tools/scan-launcher` and run `npm run start` there directly.
 
 Current bootstrap behavior:
 
-- scans the mounted media directory on startup
-- builds a sequential in-memory playlist from supported file extensions
+- scans the mounted media directory on startup when `video.source_dir` is configured
+- appends any configured `video.urls` remote inputs to the playlist
+- builds a sequential in-memory playlist from supported file extensions and remote URLs
 - starts a single `ffmpeg` process for the current media item
 - pushes media to a local RTMP relay at `rtmp://relay:1935/live/input`
 - lets the relay container push onward to Douyu

@@ -10,7 +10,8 @@ Provide a lightweight launcher plus an optional scan provider that:
 2. waits for QR-code scan
 3. obtains `rtmp_url` and `stream_key`
 4. writes them into a runtime env file
-5. starts `douyu-streamer`
+5. probes the scanned target with a short ffmpeg test push
+6. starts `douyu-streamer` only if the probe succeeds
 
 ## Current layout
 

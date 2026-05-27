@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -175,6 +174,7 @@ func buildConcatArgs(cfg config.StreamConfig, concatFile string) []string {
 		"-hide_banner",
 		"-loglevel", cfg.FFmpegLogLevel,
 		"-re",
+		"-protocol_whitelist", "file,http,https,tcp,tls,crypto",
 	}
 	if cfg.LoopSingleInput {
 		args = append(args, "-stream_loop", "-1")
@@ -231,7 +231,7 @@ func writeConcatFile(items []library.Item) (string, error) {
 }
 
 func escapeConcatPath(path string) string {
-	return strings.ReplaceAll(filepath.Clean(path), "'", "'\\''")
+	return strings.ReplaceAll(path, "'", "'\\''")
 }
 
 func (m *Manager) cleanupLocked() {

@@ -6,12 +6,23 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 . "${SCRIPT_DIR}/common.sh"
 REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu-rebuild}"
 VIDEO_SOURCE_HOST_DIR="${VIDEO_SOURCE_HOST_DIR:-/home/pi/samba/hard02/magic/电视剧/士兵突击(Soldiers Sortie)624x336.X264.AAC.350M.30集全[DVDRip]/output}"
+SYNC_ENV="${SYNC_ENV:-1}"
+
+scp_files="
+  ${ROOT_DIR}/docker-compose.yml
+  ${ROOT_DIR}/.env.example
+  ${ROOT_DIR}/configs/app.yaml
+  ${ROOT_DIR}/configs/nginx-rtmp.conf
+"
+
+if [ "${SYNC_ENV}" = "1" ] && [ -f "${ROOT_DIR}/.env" ]; then
+  scp_files="${scp_files}
+  ${ROOT_DIR}/.env
+"
+fi
 
 sshpass -p "${PI_PASSWORD}" scp ${PI_SCP_OPTS} \
-  "${ROOT_DIR}/docker-compose.yml" \
-  "${ROOT_DIR}/.env.example" \
-  "${ROOT_DIR}/configs/app.yaml" \
-  "${ROOT_DIR}/configs/nginx-rtmp.conf" \
+  ${scp_files} \
   "${PI_HOST}:${REMOTE_DIR}/"
 
 sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "

@@ -3,6 +3,7 @@ package library
 import (
 	"errors"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -18,6 +19,10 @@ type Item struct {
 }
 
 func Scan(sourceDir string, formats []string) ([]Item, error) {
+	if strings.TrimSpace(sourceDir) == "" {
+		return nil, nil
+	}
+
 	info, err := os.Stat(sourceDir)
 	if err != nil {
 		return nil, err
@@ -66,4 +71,58 @@ func Scan(sourceDir string, formats []string) ([]Item, error) {
 	}
 
 	return items, nil
+}
+
+func FromURLs(urls []string) []Item {
+	items := make([]Item, 0, len(urls))
+	for _, raw := range urls {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+
+		items = append(items, Item{
+			ID:     raw,
+			Path:   raw,
+			Name:   urlDisplayName(raw),
+			Format: strings.ToLower(filepath.Ext(raw)),
+		})
+	}
+
+	for i := range items {
+		items[i].Position = i
+	}
+
+	return items
+}
+
+func Merge(groups ...[]Item) []Item {
+	var merged []Item
+	position := 0
+	for _, group := range groups {
+		for _, item := range group {
+			item.Position = position
+			merged = append(merged, item)
+			position++
+		}
+	}
+	return merged
+}
+
+func urlDisplayName(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+
+	base := filepath.Base(parsed.Path)
+	if base == "." || base == "/" || base == "" {
+		if parsed.Host != "" {
+			return raw
+		}
+		return parsed.Path
+	}
+
+	ext := filepath.Ext(base)
+	return strings.TrimSuffix(base, ext)
 }
