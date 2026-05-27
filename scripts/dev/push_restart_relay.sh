@@ -27,7 +27,8 @@ sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
   if [ '${SYNC_RUNTIME_ENV}' = '1' ] && [ -f '${REMOTE_RUNTIME_ENV}.new' ]; then
     mv '${REMOTE_RUNTIME_ENV}.new' '${REMOTE_RUNTIME_ENV}'
   fi
-  docker restart '${CONTAINER_NAME}' >/dev/null
+  cd '${REMOTE_DIR}'
+  DOCKER_DEFAULT_PLATFORM=linux/arm64 docker compose up -d --force-recreate relay >/dev/null
 "
 
-echo "synced relay config and restarted: ${CONTAINER_NAME}"
+echo "synced relay config and recreated: ${CONTAINER_NAME}"

@@ -32,8 +32,10 @@ sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
   rm -f '${REMOTE_RUNTIME_DIR}/douyu-login-qr.png'
   docker run -d \
     --name '${CONTAINER_NAME}' \
+    --network 'container:douyu-app' \
     --entrypoint node \
     -e DOUYU_SCAN_RUNTIME_DIR=/app/runtime \
+    -e DOUYU_APP_NOTIFY_EVENT_URL=http://127.0.0.1:8080/notify/event \
     -v '${REMOTE_RUNTIME_DIR}:/app/runtime' \
     -v '${REMOTE_SCAN_DIR}/start.js:/app/start.js:ro' \
     -v '${REMOTE_SCAN_DIR}/package.json:/app/package.json:ro' \

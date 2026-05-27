@@ -4,32 +4,35 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/5218664b/douyu-streamer/internal/config"
 	"github.com/5218664b/douyu-streamer/internal/danmaku"
 	"github.com/5218664b/douyu-streamer/internal/library"
+	"github.com/5218664b/douyu-streamer/internal/notify"
 	"github.com/5218664b/douyu-streamer/internal/playlist"
 	"github.com/5218664b/douyu-streamer/internal/state"
 	"github.com/5218664b/douyu-streamer/internal/stream"
 )
 
 type Runtime struct {
-	mu      sync.Mutex
-	cfg     config.Config
-	state   *state.RuntimeState
+	mu       sync.Mutex
+	cfg      config.Config
+	state    *state.RuntimeState
 	playlist *playlist.Playlist
-	stream  *stream.Manager
-	cancel  context.CancelFunc
-	rootCtx context.Context
-	danmaku *danmaku.Client
+	stream   *stream.Manager
+	notifier *notify.Emailer
+	cancel   context.CancelFunc
+	rootCtx  context.Context
+	danmaku  *danmaku.Client
 }
 
 func New(cfg config.Config) (*Runtime, error) {
-	items, err := library.Scan(cfg.Video.SourceDir, cfg.Video.Formats)
+	items, err := loadItems(cfg.Video.SourceDir, cfg.Video.Formats, cfg.Video.URLs)
 	if err != nil {
-		return nil, fmt.Errorf("scan media library: %w", err)
+		return nil, err
 	}
 
 	queue, err := playlist.New(items)
@@ -42,6 +45,7 @@ func New(cfg config.Config) (*Runtime, error) {
 		state:    state.New(cfg.Video.SourceDir, cfg.Danmaku.Enabled),
 		playlist: queue,
 		stream:   stream.New(cfg.Stream),
+		notifier: notify.NewEmailer(cfg.Notify),
 		rootCtx:  context.Background(),
 	}
 	if cfg.Danmaku.Enabled {
@@ -165,7 +169,7 @@ func (r *Runtime) Reload(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	items, err := library.Scan(r.cfg.Video.SourceDir, r.cfg.Video.Formats)
+	items, err := loadItems(r.cfg.Video.SourceDir, r.cfg.Video.Formats, r.cfg.Video.URLs)
 	if err != nil {
 		r.state.SetError(err.Error())
 		return err
@@ -195,6 +199,53 @@ func (r *Runtime) Reload(ctx context.Context) error {
 	r.state.SetStatus("streaming")
 	log.Printf("runtime: restarted after reload source=%s target=%s", r.playlist.Current().Path, r.stream.Snapshot().Target)
 	return nil
+}
+
+func (r *Runtime) SendProblemEmail(ctx context.Context, kind, summary, detail string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.notifier == nil || !r.notifier.Enabled() {
+		return fmt.Errorf("email notification is not enabled")
+	}
+	if strings.TrimSpace(kind) == "" {
+		return fmt.Errorf("problem kind is required")
+	}
+	if strings.TrimSpace(summary) == "" {
+		return fmt.Errorf("problem summary is required")
+	}
+
+	r.notifyProblemLocked(kind, summary, fmt.Errorf("%s", detail))
+	return nil
+}
+
+func (r *Runtime) SendEventEmail(ctx context.Context, summary, detail string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.notifier == nil || !r.notifier.Enabled() {
+		return fmt.Errorf("email notification is not enabled")
+	}
+	if strings.TrimSpace(summary) == "" {
+		return fmt.Errorf("event summary is required")
+	}
+
+	r.notifyEventLocked(summary, detail)
+	return nil
+}
+
+func loadItems(sourceDir string, formats, urls []string) ([]library.Item, error) {
+	localItems, err := library.Scan(sourceDir, formats)
+	if err != nil {
+		return nil, fmt.Errorf("scan media library: %w", err)
+	}
+
+	items := library.Merge(localItems, library.FromURLs(urls))
+	if len(items) == 0 {
+		return nil, fmt.Errorf("build playlist: no media items found")
+	}
+
+	return items, nil
 }
 
 func (r *Runtime) syncState(status string) {
@@ -239,14 +290,14 @@ func (r *Runtime) checkStream() {
 	}
 
 	if err.Reason == stream.ExitReasonCompleted {
-	log.Printf("runtime: stream completed source=%s", r.playlist.Current().Path)
-	r.playlist.Advance()
-	r.syncState("switching")
+		log.Printf("runtime: stream completed source=%s", r.playlist.Current().Path)
+		r.playlist.Advance()
+		r.syncState("switching")
 
-	restartErr := r.stream.StartPlaylist(r.rootCtx, r.playlist.Items(), r.playlist.Current().Position)
-	if restartErr != nil {
-		r.scheduleRecoveryLocked(restartErr.Error())
-		return
+		restartErr := r.stream.StartPlaylist(r.rootCtx, r.playlist.Items(), r.playlist.Current().Position)
+		if restartErr != nil {
+			r.scheduleRecoveryLocked(restartErr.Error())
+			return
 		}
 
 		r.state.ClearError()
@@ -271,6 +322,7 @@ func (r *Runtime) checkStream() {
 	r.state.SetProcess(r.stream.Snapshot())
 	r.state.SetStatus("streaming")
 	log.Printf("runtime: recovered source=%s", r.playlist.Current().Path)
+	return
 }
 
 func (r *Runtime) handleDanmakuCommand(cmd string) {
@@ -327,4 +379,49 @@ func (r *Runtime) retryRecover() error {
 	r.state.SetStatus("streaming")
 	log.Printf("runtime: recovery retry succeeded source=%s", r.playlist.Current().Path)
 	return nil
+}
+
+func (r *Runtime) notifyProblemLocked(kind string, summary string, err error) {
+	if r.notifier == nil || !r.notifier.Enabled() {
+		return
+	}
+
+	body := fmt.Sprintf(
+		"时间: %s\n状态: %s\n房间: %s\n当前输入: %s\n推流目标: %s\n错误类型: %s\n错误信息: %v\n恢复次数: %d\n\n提示: 如果是斗鱼推流码失效，请重新扫码或更新推流码。",
+		time.Now().Format(time.RFC3339),
+		r.state.Snapshot().Status,
+		r.cfg.Room.URL,
+		r.playlist.Current().Path,
+		r.stream.Snapshot().Target,
+		kind,
+		err,
+		r.state.Snapshot().Recoveries,
+	)
+	if notifyErr := r.notifier.NotifyProblem(context.Background(), summary, body, kind); notifyErr != nil {
+		log.Printf("runtime: send problem email failed: %v", notifyErr)
+	}
+}
+
+func (r *Runtime) notifyEventLocked(summary string, detail string) {
+	if r.notifier == nil || !r.notifier.Enabled() {
+		return
+	}
+
+	currentSource := ""
+	if r.playlist != nil {
+		currentSource = r.playlist.Current().Path
+	}
+
+	body := fmt.Sprintf(
+		"时间: %s\n状态: %s\n房间: %s\n当前输入: %s\n推流目标: %s\n说明: %s",
+		time.Now().Format(time.RFC3339),
+		r.state.Snapshot().Status,
+		r.cfg.Room.URL,
+		currentSource,
+		r.stream.Snapshot().Target,
+		strings.TrimSpace(detail),
+	)
+	if notifyErr := r.notifier.NotifyEvent(context.Background(), summary, body); notifyErr != nil {
+		log.Printf("runtime: send event email failed: %v", notifyErr)
+	}
 }

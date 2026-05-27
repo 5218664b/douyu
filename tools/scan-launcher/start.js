@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
+const http = require("node:http");
 const path = require("node:path");
 const puppeteer = require("puppeteer");
 const Jimp = require("jimp");
@@ -29,6 +30,7 @@ const runtimeDir = resolveRuntimeDir();
 const outputPath = path.join(runtimeDir, "stream.env");
 const qrOutputPath = path.join(runtimeDir, "douyu-login-qr.png");
 const roomUrl = process.env.DOUYU_SCAN_ROOM_URL || "https://www.douyu.com/creator/main/live";
+const notifyEventURL = process.env.DOUYU_APP_NOTIFY_EVENT_URL || "http://app:8080/notify/event";
 const browserPath =
   process.env.DOUYU_SCAN_BROWSER_PATH || "/usr/bin/chromium" || "/usr/bin/chromium-browser";
 const headless = String(process.env.DOUYU_SCAN_HEADLESS || "true").toLowerCase() !== "false";
@@ -85,6 +87,70 @@ async function writeRuntimeEnv(rtmpUrl, streamKey) {
   ];
   await fsp.writeFile(outputPath, `${lines.join("\n")}\n`, "utf8");
   console.log(`wrote runtime stream env: ${outputPath}`);
+}
+
+async function sendScanSuccessEmail() {
+  const payload = JSON.stringify({
+    summary: "扫码成功",
+    detail: "斗鱼扫码成功，已获取新的推流地址和推流码。"
+  });
+
+  await new Promise((resolve, reject) => {
+    const request = http.request(
+      notifyEventURL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(payload)
+        },
+        timeout: 15000
+      },
+      (response) => {
+        let body = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          body += chunk;
+        });
+        response.on("end", () => {
+          if (response.statusCode && response.statusCode >= 200 && response.statusCode < 300) {
+            resolve();
+            return;
+          }
+          reject(new Error(`notify event failed: status=${response.statusCode} body=${body}`));
+        });
+      }
+    );
+
+    request.on("timeout", () => {
+      request.destroy(new Error("notify event timeout"));
+    });
+    request.on("error", reject);
+    request.write(payload);
+    request.end();
+  });
+
+  console.log("scan success email sent");
+}
+
+function isValidDouyuRTMPURL(value) {
+  if (!value) {
+    return false;
+  }
+  return /^rtmp:\/\/send[a-z0-9.-]*\.douyu\.com\/live$/i.test(value.trim());
+}
+
+function isValidDouyuStreamKey(value) {
+  if (!value) {
+    return false;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed === "replace-me" || trimmed.includes("send.example.douyu.com")) {
+    return false;
+  }
+
+  return /wsSecret=/.test(trimmed) && /wsTime=/.test(trimmed) && trimmed.length >= 32;
 }
 
 async function readClipboardText(page) {
@@ -253,10 +319,17 @@ async function run() {
     if (!rtmpUrl || !streamKey) {
       throw new Error("failed to fetch rtmp_url or stream_key from Douyu page");
     }
+    if (!isValidDouyuRTMPURL(rtmpUrl)) {
+      throw new Error(`invalid douyu rtmp_url: ${rtmpUrl}`);
+    }
+    if (!isValidDouyuStreamKey(streamKey)) {
+      throw new Error(`invalid douyu stream_key: ${streamKey}`);
+    }
 
     console.log(`rtmp_url: ${rtmpUrl}`);
     console.log(`stream_key: ${streamKey}`);
     await writeRuntimeEnv(rtmpUrl, streamKey);
+    await sendScanSuccessEmail();
   } finally {
     await browser.close();
   }

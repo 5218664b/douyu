@@ -2,7 +2,7 @@
 
 这是一个面向树莓派 4B 的斗鱼自动推流系统设计文档。
 
-新系统不再沿用当前仓库中 Python、Node.js、shell、浏览器自动化和本地 relay 混合在一起的实现方式，而是收缩为一条更短、更稳、更轻的主链路：`Go 主程序 + ffmpeg 直推斗鱼`。
+新系统收敛为一条更短、更稳、更轻的主链路：`Go 主程序 + ffmpeg 推本地 relay + relay 转推斗鱼`。
 
 本文档只描述重构后的目标架构，不描述旧脚本如何运行。
 
@@ -40,7 +40,7 @@
 - 如果 `.env` 不存在，就从 `.env.example` 生成
 - 重建 `app / relay / scan-provider`
 - 在当前终端打印二维码
-- 扫码成功后自动开始推流
+- 只有在成功解析到有效的斗鱼推流地址和推流码后，才自动开始推流
 
 ## 新树莓派初始化
 
@@ -96,6 +96,14 @@ cp .env.example .env
   改成你自己的直播间地址
 - `DOUYU_SCAN_HEADLESS`
   默认 `true`，一般保持即可
+- `DOUYU_STREAMER_NOTIFY_ENABLED`
+  如果要启用推流失败邮件提醒，改成 `true`
+- `DOUYU_STREAMER_NOTIFY_SMTP_HOST` / `DOUYU_STREAMER_NOTIFY_SMTP_PORT`
+  填你的 SMTP 服务器地址和端口
+- `DOUYU_STREAMER_NOTIFY_USERNAME` / `DOUYU_STREAMER_NOTIFY_PASSWORD`
+  一般填邮箱账号和 SMTP 授权码
+- `DOUYU_STREAMER_NOTIFY_FROM` / `DOUYU_STREAMER_NOTIFY_TO`
+  发件人和收件人邮箱
 
 通常不需要改的：
 
@@ -115,6 +123,11 @@ cp .env.example .env
 ./scripts/dev/release_pi_images.sh
 ```
 
+其中发布 app 镜像默认只构建并推送 `douyu-app:pi4b`。只有在底层运行时依赖变化时，才需要额外设置 `PUSH_BASE_IMAGE=1` 重新发布 base 镜像。
+
+如果你已经修改了本地 `.env`，并希望把邮件告警等环境变量一起同步到树莓派，推荐在发布镜像后执行菜单 `9`。
+当前 `9` 会重建树莓派上的 `app + relay`，并默认同步本地 `.env`。
+
 5. 在树莓派本机一键部署并扫码启动
 
 ```bash
@@ -127,7 +140,7 @@ cp .env.example .env
 
 - 树莓派优先：以 Raspberry Pi 4B 的 CPU、内存、IO 和长期运行稳定性为首要约束。
 - 主链路最短：播放器调度与推流尽量直连，减少中间服务和故障点。
-- 低服务复杂度：默认不引入 relay、浏览器自动化取码、数据库和多服务编排。
+- 低服务复杂度：主链路固定为 `app + relay`，扫码取码作为独立辅助步骤存在。
 - Docker 优先：为了和树莓派上其他应用的部署方式统一，主系统默认以单容器形式交付。
 - 可扩展：弹幕控制、状态接口和外部辅助工具保留扩展边界，但不进入第一层核心链路。
 
@@ -136,18 +149,50 @@ cp .env.example .env
 重构后的系统只保留两个核心运行单元：
 
 - `app`：Go 主程序。负责配置加载、视频扫描、播放队列、视频切换、弹幕控制、状态管理和本地 API。
-- `ffmpeg`：由主程序在容器内托管的推流子进程。负责把当前视频推送到斗鱼远端 RTMP 地址。
+- `ffmpeg`：由主程序在容器内托管的推流子进程。负责把当前视频推送到本地 relay。
+- `relay`：本地 RTMP 中转。负责把 `app` 推来的流转推到扫码获取的斗鱼远端 RTMP 地址。
 
 系统主链路如下：
 
-1. `app` 从挂载的视频目录扫描可播放媒体文件。
+1. `app` 从挂载的视频目录扫描可播放媒体文件，并可附加配置中的远程 URL 输入。
 2. `app` 根据顺序策略建立播放队列。
-3. `app` 启动 `ffmpeg`，将当前媒体直接推送到斗鱼。
-4. `app` 维护当前项、下一项和播放历史，并在合适时机触发切换。
-5. `app` 监听斗鱼弹幕，把控制命令转换为播放队列变更。
-6. `app` 通过本地 HTTP API 输出状态信息，供查看和运维使用。
+3. `app` 启动 `ffmpeg`，将当前媒体推送到本地 relay。
+4. `relay` 将流转推到扫码获取的斗鱼地址。
+5. `app` 维护当前项、下一项和播放历史，并在合适时机触发切换。
+6. `app` 监听斗鱼弹幕，把控制命令转换为播放队列变更。
+7. `app` 通过本地 HTTP API 输出状态信息，供查看和运维使用。
 
-默认情况下，系统不依赖本地 relay，不依赖常驻浏览器自动化取码，也不依赖数据库。
+默认情况下，系统依赖本地 relay，不依赖常驻浏览器自动化取码，也不依赖数据库。
+
+`relay` 不应在 `.env` 中预置占位的远端推流地址。正常流程应当是扫码成功后，由 `runtime/stream.env` 提供真实的斗鱼转推目标；如果仍然是 `replace-me` 之类的假值，relay 会拒绝启动。
+
+## 邮件告警
+
+系统现在只保留 3 类业务邮件提醒：
+
+- 扫码成功后提醒
+- 推流连续稳定 30 秒后提醒
+- relay 检测到向斗鱼转推失败时，提醒“推流码可能已失效，推流失败”
+
+可通过 `.env` 或 `configs/app.yaml` 配置，推荐优先使用 `.env`：
+
+```bash
+DOUYU_STREAMER_NOTIFY_ENABLED=true
+DOUYU_STREAMER_NOTIFY_SMTP_HOST=smtp.example.com
+DOUYU_STREAMER_NOTIFY_SMTP_PORT=587
+DOUYU_STREAMER_NOTIFY_USERNAME=alert@example.com
+DOUYU_STREAMER_NOTIFY_PASSWORD=replace-with-smtp-app-password
+DOUYU_STREAMER_NOTIFY_FROM=alert@example.com
+DOUYU_STREAMER_NOTIFY_TO=your-mail@example.com
+DOUYU_STREAMER_NOTIFY_SUBJECT_PREFIX=[douyu-streamer]
+DOUYU_STREAMER_NOTIFY_COOLDOWN_SECONDS=1800
+```
+
+邮件会在这些场景触发：
+
+- 扫码成功后发送 1 封提醒
+- 推流连续稳定 30 秒后发送 1 封成功提醒
+- relay 检测到向斗鱼转推失败时发送 1 封“推流码可能已失效”提醒
 
 ## 目标目录结构
 
@@ -201,7 +246,7 @@ douyu-streamer/
 主程序内部模块如下：
 
 - `config`：读取 `app.yaml` 和环境变量，输出统一配置对象。
-- `library`：扫描视频目录，识别可播放文件并提取基础元数据。
+- `library`：扫描视频目录、装载远程 URL，并提取基础元数据。
 - `playlist`：维护播放队列、当前项、下一项和历史记录。
 - `stream`：托管 `ffmpeg` 进程，负责启动、停止、重启和异常处理。
 - `danmaku`：连接斗鱼弹幕源，解析消息并转化为控制命令。
@@ -210,15 +255,16 @@ douyu-streamer/
 
 ## 推流模型
 
-新系统的核心推流策略是：`ffmpeg` 直推斗鱼。
+新系统当前的核心推流策略是：`app -> relay -> douyu`。
 
 这意味着：
 
-- 不在第一版中引入本地 `nginx-rtmp`
-- 不做“主程序 -> relay -> 斗鱼”的双层推流
-- 不用 relay 的 `/stat` 接口作为切换决策基础
+- `app` 的推流目标固定为本地 relay：`rtmp://relay:1935/live/input`
+- 扫码流程只负责更新 relay 的远端转推目标
+- `app` 不直接推送扫码拿到的斗鱼远端 RTMP 地址
+- 切换策略仍由主程序控制，不依赖 relay 的 `/stat` 接口
 
-直推方案的优先级更高，是因为树莓派 4B 更需要降低运行复杂度，而不是追求过早的平滑切换优化。
+这样做的原因很实际：把“本地播放控制”和“斗鱼推流码动态变化”拆开后，日常运维和扫码刷新会稳定很多。
 
 主程序只负责：
 
@@ -269,7 +315,7 @@ douyu-streamer/
 - 调整下一项优先级
 - 记录最近播放历史
 
-切换策略由主程序控制，不依赖额外中转层的状态接口。系统优先保证：
+切换策略由主程序控制，不依赖 relay 状态接口。系统优先保证：
 
 - 播放顺序清晰
 - 切换逻辑可控

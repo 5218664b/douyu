@@ -8,6 +8,55 @@ REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu-rebuild}"
 REMOTE_RUNTIME_ENV="${REMOTE_DIR}/runtime/stream.env"
 REMOTE_QR_IMAGE="${REMOTE_DIR}/runtime/douyu-login-qr.png"
 SCAN_CONTAINER_NAME="douyu-scan"
+APP_CONTAINER_NAME="${APP_CONTAINER_NAME:-douyu-app}"
+APP_API_URL="${APP_API_URL:-http://127.0.0.1:8080/state}"
+APP_STABILITY_SECONDS="${APP_STABILITY_SECONDS:-15}"
+
+validate_remote_stream_env() {
+  sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
+    set -eu
+    test -f '${REMOTE_RUNTIME_ENV}'
+    rtmp_url=\$(grep '^DOUYU_STREAMER_STREAM_RTMP_URL=' '${REMOTE_RUNTIME_ENV}' | tail -n 1 | cut -d= -f2-)
+    stream_key=\$(grep '^DOUYU_STREAMER_STREAM_KEY=' '${REMOTE_RUNTIME_ENV}' | tail -n 1 | cut -d= -f2-)
+    printf '%s\n' \"\${rtmp_url}\" | grep -Eq '^rtmp://send[a-z0-9.-]*\\.douyu\\.com/live$'
+    printf '%s\n' \"\${stream_key}\" | grep -q 'wsSecret='
+    printf '%s\n' \"\${stream_key}\" | grep -q 'wsTime='
+  "
+}
+
+probe_remote_stream_target() {
+  sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
+    set -eu
+    rtmp_url=\$(grep '^DOUYU_STREAMER_STREAM_RTMP_URL=' '${REMOTE_RUNTIME_ENV}' | tail -n 1 | cut -d= -f2-)
+    stream_key=\$(grep '^DOUYU_STREAMER_STREAM_KEY=' '${REMOTE_RUNTIME_ENV}' | tail -n 1 | cut -d= -f2-)
+    target=\"\${rtmp_url%/}/\${stream_key}\"
+    docker exec '${APP_CONTAINER_NAME}' sh -lc '
+      ffmpeg -hide_banner -loglevel error \
+        -f lavfi -i testsrc2=size=640x360:rate=15 \
+        -f lavfi -i anullsrc=r=44100:cl=stereo \
+        -t 5 \
+        -c:v libx264 -preset ultrafast \
+        -c:a aac -b:a 128k \
+        -f flv \"\$0\"
+    ' \"\${target}\"
+  "
+}
+
+verify_remote_app_streaming() {
+  sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
+    set -eu
+    deadline=\$((\$(date +%s) + ${APP_STABILITY_SECONDS}))
+    while [ \$(date +%s) -lt \${deadline} ]; do
+      state=\$(curl -fsS '${APP_API_URL}' || true)
+      if [ -z \"\${state}\" ]; then
+        exit 1
+      fi
+      printf '%s\n' \"\${state}\" | grep -q '\"status\":\"streaming\"' || exit 1
+      printf '%s\n' \"\${state}\" | grep -q '\"running\":true' || exit 1
+      sleep 1
+    done
+  "
+}
 
 sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
   rm -f '${REMOTE_RUNTIME_ENV}' '${REMOTE_QR_IMAGE}'
@@ -34,12 +83,14 @@ if [ "${EXIT_CODE}" != "0" ]; then
   exit 1
 fi
 
-if ! sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
-  test -f '${REMOTE_RUNTIME_ENV}' &&
-  grep -q '^DOUYU_STREAMER_STREAM_RTMP_URL=' '${REMOTE_RUNTIME_ENV}' &&
-  grep -q '^DOUYU_STREAMER_STREAM_KEY=' '${REMOTE_RUNTIME_ENV}'
-"; then
-  echo "scan-provider exited successfully, but runtime stream credentials were not written" >&2
+if ! validate_remote_stream_env; then
+  echo "scan-provider exited successfully, but runtime stream credentials are missing or invalid; refusing to restart streaming" >&2
+  exit 1
+fi
+
+echo "probing scanned stream target..."
+if ! probe_remote_stream_target; then
+  echo "scanned stream target probe failed; refusing to restart streaming" >&2
   exit 1
 fi
 
@@ -51,5 +102,11 @@ echo "stream credentials received; restarting relay..."
 
 echo "restarting app..."
 SYNC_CONFIG=0 "${ROOT_DIR}/scripts/dev/push_restart_app.sh"
+
+echo "verifying app streaming stability..."
+if ! verify_remote_app_streaming; then
+  echo "app did not stay in streaming state after restart; refusing to treat scan as successful" >&2
+  exit 1
+fi
 
 echo "scan completed and streaming restarted"

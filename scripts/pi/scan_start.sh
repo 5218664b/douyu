@@ -8,14 +8,56 @@ QR_IMAGE="${RUNTIME_DIR}/douyu-login-qr.png"
 SCAN_CONTAINER_NAME="douyu-scan"
 RELAY_CONTAINER_NAME="douyu-relay"
 APP_CONTAINER_NAME="douyu-app"
+APP_API_URL="${APP_API_URL:-http://127.0.0.1:8080/state}"
+APP_STABILITY_SECONDS="${APP_STABILITY_SECONDS:-15}"
+
+validate_stream_env() {
+  [ -f "${RUNTIME_ENV}" ] || return 1
+
+  rtmp_url="$(grep '^DOUYU_STREAMER_STREAM_RTMP_URL=' "${RUNTIME_ENV}" | tail -n 1 | cut -d= -f2-)"
+  stream_key="$(grep '^DOUYU_STREAMER_STREAM_KEY=' "${RUNTIME_ENV}" | tail -n 1 | cut -d= -f2-)"
+
+  printf '%s\n' "${rtmp_url}" | grep -Eq '^rtmp://send[a-z0-9.-]*\.douyu\.com/live$'
+  printf '%s\n' "${stream_key}" | grep -q 'wsSecret='
+  printf '%s\n' "${stream_key}" | grep -q 'wsTime='
+}
+
+probe_stream_target() {
+  rtmp_url="$(grep '^DOUYU_STREAMER_STREAM_RTMP_URL=' "${RUNTIME_ENV}" | tail -n 1 | cut -d= -f2-)"
+  stream_key="$(grep '^DOUYU_STREAMER_STREAM_KEY=' "${RUNTIME_ENV}" | tail -n 1 | cut -d= -f2-)"
+  target="${rtmp_url%/}/${stream_key}"
+
+  docker exec "${APP_CONTAINER_NAME}" sh -lc '
+    ffmpeg -hide_banner -loglevel error \
+      -f lavfi -i testsrc2=size=640x360:rate=15 \
+      -f lavfi -i anullsrc=r=44100:cl=stereo \
+      -t 5 \
+      -c:v libx264 -preset ultrafast \
+      -c:a aac -b:a 128k \
+      -f flv "$0"
+  ' "${target}"
+}
+
+verify_app_streaming() {
+  deadline="$(( $(date +%s) + ${APP_STABILITY_SECONDS} ))"
+  while [ "$(date +%s)" -lt "${deadline}" ]; do
+    state="$(curl -fsS "${APP_API_URL}" || true)"
+    [ -n "${state}" ] || return 1
+    printf '%s\n' "${state}" | grep -q '"status":"streaming"' || return 1
+    printf '%s\n' "${state}" | grep -q '"running":true' || return 1
+    sleep 1
+  done
+}
 
 rm -f "${RUNTIME_ENV}" "${QR_IMAGE}"
 
 docker rm -f "${SCAN_CONTAINER_NAME}" >/dev/null 2>&1 || true
 docker run -d \
   --name "${SCAN_CONTAINER_NAME}" \
+  --network "container:${APP_CONTAINER_NAME}" \
   --entrypoint node \
   -e DOUYU_SCAN_RUNTIME_DIR=/app/runtime \
+  -e DOUYU_APP_NOTIFY_EVENT_URL=http://127.0.0.1:8080/notify/event \
   -v "${RUNTIME_DIR}:/app/runtime" \
   -v "${ROOT_DIR}/tools/scan-launcher/start.js:/app/start.js:ro" \
   -v "${ROOT_DIR}/tools/scan-launcher/package.json:/app/package.json:ro" \
@@ -38,10 +80,14 @@ if [ "${EXIT_CODE}" != "0" ]; then
   exit 1
 fi
 
-if [ ! -f "${RUNTIME_ENV}" ] || \
-   ! grep -q '^DOUYU_STREAMER_STREAM_RTMP_URL=' "${RUNTIME_ENV}" || \
-   ! grep -q '^DOUYU_STREAMER_STREAM_KEY=' "${RUNTIME_ENV}"; then
-  echo "scan-provider exited successfully, but runtime stream credentials were not written" >&2
+if ! validate_stream_env; then
+  echo "scan-provider exited successfully, but runtime stream credentials are missing or invalid; refusing to restart streaming" >&2
+  exit 1
+fi
+
+echo "probing scanned stream target..."
+if ! probe_stream_target; then
+  echo "scanned stream target probe failed; refusing to restart streaming" >&2
   exit 1
 fi
 
@@ -50,5 +96,11 @@ trap - EXIT INT TERM
 
 docker restart "${RELAY_CONTAINER_NAME}" >/dev/null
 docker restart "${APP_CONTAINER_NAME}" >/dev/null
+
+echo "verifying app streaming stability..."
+if ! verify_app_streaming; then
+  echo "app did not stay in streaming state after restart; refusing to treat scan as successful" >&2
+  exit 1
+fi
 
 echo "scan completed and streaming restarted"
