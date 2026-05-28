@@ -7,12 +7,15 @@ CONF_PATH="/etc/nginx/nginx.conf"
 ERROR_LOG_PATH="/var/log/nginx/error.log"
 APP_NOTIFY_URL="${DOUYU_APP_NOTIFY_URL:-http://app:8080/notify/problem}"
 APP_NOTIFY_EVENT_URL="${DOUYU_APP_NOTIFY_EVENT_URL:-http://app:8080/notify/event}"
+APP_STOP_URL="${DOUYU_APP_STOP_URL:-http://app:8080/stop}"
 RELAY_ALERT_KIND="relay_push_failed"
 RELAY_ALERT_SUMMARY="推流码可能已失效，推流失败"
 RELAY_SUCCESS_SUMMARY="推流成功"
 RELAY_SUCCESS_DETAIL="relay 已连续向斗鱼稳定转推 30 秒。"
 SUCCESS_DELAY_SECONDS="${DOUYU_RELAY_SUCCESS_DELAY_SECONDS:-30}"
 SUCCESS_TIMER_PID=""
+RELAY_FAILURE_THRESHOLD="${DOUYU_RELAY_FAILURE_THRESHOLD:-2}"
+FAILURE_COUNT=0
 
 read_runtime_env_value() {
   key="$1"
@@ -57,6 +60,14 @@ notify_event() {
     "${APP_NOTIFY_EVENT_URL}" >/dev/null 2>&1
 }
 
+stop_app_stream() {
+  curl -fsS -X POST "${APP_STOP_URL}" >/dev/null 2>&1
+}
+
+stop_relay() {
+  kill -TERM 1 >/dev/null 2>&1 || true
+}
+
 cancel_success_timer() {
   if [ -n "${SUCCESS_TIMER_PID}" ] && kill -0 "${SUCCESS_TIMER_PID}" >/dev/null 2>&1; then
     echo "relay success timer cancelled" >&2
@@ -90,13 +101,21 @@ watch_relay_errors() {
     echo "${line}"
     case "${line}" in
       *"relay: create push "*)
+        FAILURE_COUNT=0
         cancel_success_timer
         schedule_success_notification
         ;;
       *"disconnect"*"sendhw"*|*"disconnect"*"douyu"*|*"push"*"failed"*|*"connect()"*"failed"*|*"NetStream.Publish.BadName"*|*"access denied"*|*"Broken pipe"*|*"Input/output error"*)
         cancel_success_timer
+        FAILURE_COUNT=$((FAILURE_COUNT + 1))
         echo "relay detected upstream push failure: ${line}" >&2
         notify_problem "${line}"
+        if [ "${FAILURE_COUNT}" -ge "${RELAY_FAILURE_THRESHOLD}" ]; then
+          echo "relay failure threshold reached: stopping app stream and relay" >&2
+          stop_app_stream || true
+          stop_relay
+          FAILURE_COUNT=0
+        fi
         ;;
       *"deleteStream, client: sendhw"*|*"deleteStream, client: "*".douyu."*)
         cancel_success_timer

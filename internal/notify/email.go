@@ -16,11 +16,10 @@ import (
 const defaultSendTimeout = 15 * time.Second
 
 type Emailer struct {
-	cfg           config.NotifyConfig
-	mu            sync.Mutex
-	lastSentAt    time.Time
-	lastSentKey   string
-	problemActive bool
+	cfg         config.NotifyConfig
+	mu          sync.Mutex
+	lastSentAt  time.Time
+	lastSentKey string
 }
 
 func NewEmailer(cfg config.NotifyConfig) *Emailer {
@@ -37,17 +36,12 @@ func (e *Emailer) NotifyProblem(ctx context.Context, subject, body, dedupeKey st
 	}
 
 	e.mu.Lock()
-	if e.problemActive {
-		e.mu.Unlock()
-		return nil
-	}
 	if e.shouldSkipLocked(dedupeKey) {
 		e.mu.Unlock()
 		return nil
 	}
 	e.lastSentAt = time.Now()
 	e.lastSentKey = dedupeKey
-	e.problemActive = true
 	e.mu.Unlock()
 
 	return e.send(ctx, subject, body)

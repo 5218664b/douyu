@@ -29,6 +29,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/state", s.handleState)
 	mux.HandleFunc("/next", s.handleNext)
 	mux.HandleFunc("/reload", s.handleReload)
+	mux.HandleFunc("/stop", s.handleStop)
 	mux.HandleFunc("/notify/event", s.handleNotifyEvent)
 	mux.HandleFunc("/notify/problem", s.handleNotifyProblem)
 	return mux
@@ -63,6 +64,20 @@ func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.app.Reload(context.Background()); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, s.runtime.Snapshot())
+}
+
+func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+
+	if err := s.app.Shutdown(); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
