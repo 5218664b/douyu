@@ -4,7 +4,7 @@ set -eu
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck disable=SC1091
 . "${SCRIPT_DIR}/common.sh"
-REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu-rebuild}"
+REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu}"
 REMOTE_RUNTIME_DIR="${REMOTE_DIR}/runtime"
 REMOTE_SCAN_DIR="${REMOTE_DIR}/scan-launcher-src"
 CONTAINER_NAME="douyu-scan"

@@ -4,7 +4,7 @@ set -eu
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck disable=SC1091
 . "${SCRIPT_DIR}/common.sh"
-REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu-rebuild}"
+REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu}"
 VIDEO_SOURCE_HOST_DIR="${VIDEO_SOURCE_HOST_DIR:-/home/pi/samba/hard02/magic/电视剧/士兵突击(Soldiers Sortie)624x336.X264.AAC.350M.30集全[DVDRip]/output}"
 SYNC_ENV="${SYNC_ENV:-1}"
 

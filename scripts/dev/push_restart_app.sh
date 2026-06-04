@@ -4,7 +4,7 @@ set -eu
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck disable=SC1091
 . "${SCRIPT_DIR}/common.sh"
-REMOTE_DIR="/home/pi/douyu-rebuild"
+REMOTE_DIR="/home/pi/douyu"
 REMOTE_BIN="${REMOTE_DIR}/douyu-streamer"
 REMOTE_CONFIG="${REMOTE_DIR}/configs/app.yaml"
 CONTAINER_NAME="douyu-app"

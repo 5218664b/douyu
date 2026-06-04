@@ -57,7 +57,7 @@ Defaults baked into the helper script:
 
 - host: `pi@192.168.2.105`
 - password: `x`
-- remote directory: `/home/pi/douyu-rebuild`
+- remote directory: `/home/pi/douyu`
 - container name: `douyu-app`
 - config sync: enabled
 

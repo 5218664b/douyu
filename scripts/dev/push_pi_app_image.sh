@@ -4,7 +4,7 @@ set -eu
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck disable=SC1091
 . "${SCRIPT_DIR}/common.sh"
-REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu-rebuild}"
+REMOTE_DIR="${REMOTE_DIR:-/home/pi/douyu}"
 APP_BASE_IMAGE="douyu-app-base:pi4b"
 APP_IMAGE="douyu-app:pi4b"
 APP_BASE_TAR_NAME="douyu-app-base-pi4b.tar"

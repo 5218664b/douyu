@@ -10,6 +10,7 @@ RELAY_CONTAINER_NAME="douyu-relay"
 APP_CONTAINER_NAME="douyu-app"
 APP_API_URL="${APP_API_URL:-http://127.0.0.1:8080/state}"
 APP_STABILITY_SECONDS="${APP_STABILITY_SECONDS:-15}"
+APP_STARTUP_TIMEOUT_SECONDS="${APP_STARTUP_TIMEOUT_SECONDS:-30}"
 
 validate_stream_env() {
   [ -f "${RUNTIME_ENV}" ] || return 1
@@ -39,14 +40,25 @@ probe_stream_target() {
 }
 
 verify_app_streaming() {
-  deadline="$(( $(date +%s) + ${APP_STABILITY_SECONDS} ))"
-  while [ "$(date +%s)" -lt "${deadline}" ]; do
+  startup_deadline="$(( $(date +%s) + ${APP_STARTUP_TIMEOUT_SECONDS} ))"
+  stable_count=0
+
+  while [ "$(date +%s)" -lt "${startup_deadline}" ]; do
     state="$(curl -fsS "${APP_API_URL}" || true)"
-    [ -n "${state}" ] || return 1
-    printf '%s\n' "${state}" | grep -q '"status":"streaming"' || return 1
-    printf '%s\n' "${state}" | grep -q '"running":true' || return 1
+    if [ -n "${state}" ] \
+      && printf '%s\n' "${state}" | grep -q '"status":"streaming"' \
+      && printf '%s\n' "${state}" | grep -q '"running":true'; then
+      stable_count=$((stable_count + 1))
+      if [ "${stable_count}" -ge "${APP_STABILITY_SECONDS}" ]; then
+        return 0
+      fi
+    else
+      stable_count=0
+    fi
     sleep 1
   done
+
+  return 1
 }
 
 rm -f "${RUNTIME_ENV}" "${QR_IMAGE}"
@@ -85,6 +97,8 @@ if ! validate_stream_env; then
   exit 1
 fi
 
+echo "scan credentials captured successfully"
+
 echo "probing scanned stream target..."
 if ! probe_stream_target; then
   echo "scanned stream target probe failed; refusing to restart streaming" >&2
@@ -95,12 +109,12 @@ cleanup
 trap - EXIT INT TERM
 
 docker restart "${RELAY_CONTAINER_NAME}" >/dev/null
-docker restart "${APP_CONTAINER_NAME}" >/dev/null
 
 echo "verifying app streaming stability..."
 if ! verify_app_streaming; then
-  echo "app did not stay in streaming state after restart; refusing to treat scan as successful" >&2
+  echo "scan credentials were captured, but app did not stay in streaming state after relay restart" >&2
+  echo "check 'docker logs ${RELAY_CONTAINER_NAME}' for upstream Douyu disconnects and 'curl -fsS ${APP_API_URL}' for current app state" >&2
   exit 1
 fi
 
-echo "scan completed and streaming restarted"
+echo "scan completed and relay restarted"

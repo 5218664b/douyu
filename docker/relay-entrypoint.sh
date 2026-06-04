@@ -14,8 +14,10 @@ RELAY_SUCCESS_SUMMARY="推流成功"
 RELAY_SUCCESS_DETAIL="relay 已连续向斗鱼稳定转推 30 秒。"
 SUCCESS_DELAY_SECONDS="${DOUYU_RELAY_SUCCESS_DELAY_SECONDS:-30}"
 SUCCESS_TIMER_PID=""
-RELAY_FAILURE_THRESHOLD="${DOUYU_RELAY_FAILURE_THRESHOLD:-2}"
+RELAY_FAILURE_THRESHOLD="${DOUYU_RELAY_FAILURE_THRESHOLD:-4}"
+RELAY_FAILURE_WINDOW_SECONDS="${DOUYU_RELAY_FAILURE_WINDOW_SECONDS:-180}"
 FAILURE_COUNT=0
+LAST_FAILURE_AT=0
 
 read_runtime_env_value() {
   key="$1"
@@ -101,13 +103,18 @@ watch_relay_errors() {
     echo "${line}"
     case "${line}" in
       *"relay: create push "*)
-        FAILURE_COUNT=0
         cancel_success_timer
         schedule_success_notification
         ;;
       *"disconnect"*"sendhw"*|*"disconnect"*"douyu"*|*"push"*"failed"*|*"connect()"*"failed"*|*"NetStream.Publish.BadName"*|*"access denied"*|*"Broken pipe"*|*"Input/output error"*)
         cancel_success_timer
-        FAILURE_COUNT=$((FAILURE_COUNT + 1))
+        NOW_AT="$(date +%s)"
+        if [ $((NOW_AT - LAST_FAILURE_AT)) -gt "${RELAY_FAILURE_WINDOW_SECONDS}" ]; then
+          FAILURE_COUNT=1
+        else
+          FAILURE_COUNT=$((FAILURE_COUNT + 1))
+        fi
+        LAST_FAILURE_AT="${NOW_AT}"
         echo "relay detected upstream push failure: ${line}" >&2
         notify_problem "${line}"
         if [ "${FAILURE_COUNT}" -ge "${RELAY_FAILURE_THRESHOLD}" ]; then
