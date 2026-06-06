@@ -13,6 +13,27 @@ APP_API_URL="${APP_API_URL:-http://127.0.0.1:8080/state}"
 APP_STABILITY_SECONDS="${APP_STABILITY_SECONDS:-15}"
 APP_STARTUP_TIMEOUT_SECONDS="${APP_STARTUP_TIMEOUT_SECONDS:-30}"
 
+remote_app_container_exists() {
+  sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
+    docker ps -a --format '{{.Names}}' | grep -Fx '${APP_CONTAINER_NAME}' >/dev/null
+  "
+}
+
+ensure_remote_app_and_relay_ready() {
+  if remote_app_container_exists; then
+    return 0
+  fi
+
+  echo "remote app container is missing; redeploying app and relay before scan..." >&2
+  "${ROOT_DIR}/scripts/dev/redeploy_pi.sh"
+}
+
+fetch_remote_app_state() {
+  sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
+    curl -fsS '${APP_API_URL}' || true
+  "
+}
+
 validate_remote_stream_env() {
   sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
     set -eu
@@ -48,8 +69,12 @@ verify_remote_app_streaming() {
     set -eu
     startup_deadline=\$((\$(date +%s) + ${APP_STARTUP_TIMEOUT_SECONDS}))
     stable_count=0
+    last_state=''
     while [ \$(date +%s) -lt \${startup_deadline} ]; do
       state=\$(curl -fsS '${APP_API_URL}' || true)
+      if [ -n \"\${state}\" ]; then
+        last_state=\"\${state}\"
+      fi
       if [ -n \"\${state}\" ] \
         && printf '%s\n' \"\${state}\" | grep -q '\"status\":\"streaming\"' \
         && printf '%s\n' \"\${state}\" | grep -q '\"running\":true'; then
@@ -62,13 +87,34 @@ verify_remote_app_streaming() {
       fi
       sleep 1
     done
+    if [ -n \"\${last_state}\" ]; then
+      printf '%s\n' \"\${last_state}\" >&2
+    else
+      echo 'no app state response received from ${APP_API_URL}' >&2
+    fi
     exit 1
+  "
+}
+
+remote_app_state_is_stopped() {
+  state="$(fetch_remote_app_state)"
+  if [ -n "${state}" ]; then
+    printf '%s\n' "${state}" >&2
+  fi
+  [ -n "${state}" ] && printf '%s\n' "${state}" | grep -q '"status":"stopped"'
+}
+
+restart_remote_app_container() {
+  sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
+    docker restart '${APP_CONTAINER_NAME}' >/dev/null
   "
 }
 
 sshpass -p "${PI_PASSWORD}" ssh ${PI_SSH_OPTS} "${PI_HOST}" "
   rm -f '${REMOTE_RUNTIME_ENV}' '${REMOTE_QR_IMAGE}'
 "
+
+ensure_remote_app_and_relay_ready
 
 "${ROOT_DIR}/scripts/dev/push_restart_scan_provider.sh"
 
@@ -112,6 +158,14 @@ echo "stream credentials received; restarting relay..."
 
 echo "verifying app streaming stability..."
 if ! verify_remote_app_streaming; then
+  if remote_app_state_is_stopped; then
+    echo "app is stopped after relay restart; restarting app container and verifying again..." >&2
+    restart_remote_app_container
+    if verify_remote_app_streaming; then
+      echo "scan completed after app restart"
+      exit 0
+    fi
+  fi
   echo "scan credentials were captured, but app did not stay in streaming state after relay restart" >&2
   echo "check remote 'docker logs douyu-relay' for upstream Douyu disconnects and 'curl -fsS ${APP_API_URL}' for current app state" >&2
   exit 1

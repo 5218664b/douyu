@@ -12,6 +12,10 @@ APP_API_URL="${APP_API_URL:-http://127.0.0.1:8080/state}"
 APP_STABILITY_SECONDS="${APP_STABILITY_SECONDS:-15}"
 APP_STARTUP_TIMEOUT_SECONDS="${APP_STARTUP_TIMEOUT_SECONDS:-30}"
 
+fetch_app_state() {
+  curl -fsS "${APP_API_URL}" || true
+}
+
 validate_stream_env() {
   [ -f "${RUNTIME_ENV}" ] || return 1
 
@@ -42,9 +46,13 @@ probe_stream_target() {
 verify_app_streaming() {
   startup_deadline="$(( $(date +%s) + ${APP_STARTUP_TIMEOUT_SECONDS} ))"
   stable_count=0
+  last_state=""
 
   while [ "$(date +%s)" -lt "${startup_deadline}" ]; do
-    state="$(curl -fsS "${APP_API_URL}" || true)"
+    state="$(fetch_app_state)"
+    if [ -n "${state}" ]; then
+      last_state="${state}"
+    fi
     if [ -n "${state}" ] \
       && printf '%s\n' "${state}" | grep -q '"status":"streaming"' \
       && printf '%s\n' "${state}" | grep -q '"running":true'; then
@@ -58,7 +66,25 @@ verify_app_streaming() {
     sleep 1
   done
 
+  if [ -n "${last_state}" ]; then
+    printf '%s\n' "${last_state}" >&2
+  else
+    echo "no app state response received from ${APP_API_URL}" >&2
+  fi
+
   return 1
+}
+
+app_state_is_stopped() {
+  state="$(fetch_app_state)"
+  if [ -n "${state}" ]; then
+    printf '%s\n' "${state}" >&2
+  fi
+  [ -n "${state}" ] && printf '%s\n' "${state}" | grep -q '"status":"stopped"'
+}
+
+restart_app_container() {
+  docker restart "${APP_CONTAINER_NAME}" >/dev/null
 }
 
 rm -f "${RUNTIME_ENV}" "${QR_IMAGE}"
@@ -112,6 +138,14 @@ docker restart "${RELAY_CONTAINER_NAME}" >/dev/null
 
 echo "verifying app streaming stability..."
 if ! verify_app_streaming; then
+  if app_state_is_stopped; then
+    echo "app is stopped after relay restart; restarting app container and verifying again..." >&2
+    restart_app_container
+    if verify_app_streaming; then
+      echo "scan completed after app restart"
+      exit 0
+    fi
+  fi
   echo "scan credentials were captured, but app did not stay in streaming state after relay restart" >&2
   echo "check 'docker logs ${RELAY_CONTAINER_NAME}' for upstream Douyu disconnects and 'curl -fsS ${APP_API_URL}' for current app state" >&2
   exit 1

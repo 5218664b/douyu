@@ -104,3 +104,5 @@ Relay implementation:
 - relay startup loads `DOUYU_RELAY_FORWARD_URL` from `runtime/stream.env` first, then falls back to container env
 - `scan-provider` writes `DOUYU_RELAY_FORWARD_URL` into `runtime/stream.env`
 - after a new scan, sync `runtime/stream.env` and restart the relay container to apply the refreshed forward target
+- relay upstream failure handling restarts the relay after repeated Douyu push failures; by default it does not stop the app stream
+- set `DOUYU_RELAY_STOP_APP_ON_FAILURE=true` only if you explicitly want relay failures to call the app `/stop` endpoint

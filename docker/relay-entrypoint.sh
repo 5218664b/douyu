@@ -8,6 +8,7 @@ ERROR_LOG_PATH="/var/log/nginx/error.log"
 APP_NOTIFY_URL="${DOUYU_APP_NOTIFY_URL:-http://app:8080/notify/problem}"
 APP_NOTIFY_EVENT_URL="${DOUYU_APP_NOTIFY_EVENT_URL:-http://app:8080/notify/event}"
 APP_STOP_URL="${DOUYU_APP_STOP_URL:-http://app:8080/stop}"
+STOP_APP_ON_FAILURE="${DOUYU_RELAY_STOP_APP_ON_FAILURE:-false}"
 RELAY_ALERT_KIND="relay_push_failed"
 RELAY_ALERT_SUMMARY="推流码可能已失效，推流失败"
 RELAY_SUCCESS_SUMMARY="推流成功"
@@ -66,6 +67,17 @@ stop_app_stream() {
   curl -fsS -X POST "${APP_STOP_URL}" >/dev/null 2>&1
 }
 
+should_stop_app_on_failure() {
+  case "$(printf '%s' "${STOP_APP_ON_FAILURE}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 stop_relay() {
   kill -TERM 1 >/dev/null 2>&1 || true
 }
@@ -118,8 +130,13 @@ watch_relay_errors() {
         echo "relay detected upstream push failure: ${line}" >&2
         notify_problem "${line}"
         if [ "${FAILURE_COUNT}" -ge "${RELAY_FAILURE_THRESHOLD}" ]; then
-          echo "relay failure threshold reached: stopping app stream and relay" >&2
-          stop_app_stream || true
+          echo "relay failure threshold reached" >&2
+          if should_stop_app_on_failure; then
+            echo "configured to stop app stream after relay failure threshold" >&2
+            stop_app_stream || true
+          else
+            echo "leaving app stream running; only recycling relay" >&2
+          fi
           stop_relay
           FAILURE_COUNT=0
         fi
